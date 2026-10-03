@@ -3,7 +3,8 @@ import { onMounted, ref, computed } from 'vue'
 import { api, type Run, type RunItem } from '../api'
 import { store } from '../store'
 
-const nextRunAt = ref('')
+const nextRunAt = ref<string | null>(null)
+const nextRunLoaded = ref(false)
 const runs = ref<Run[]>([])
 const items = ref<RunItem[]>([])
 const openRunId = ref<number | null>(null)
@@ -11,6 +12,12 @@ const busy = ref(false)
 const msg = ref('')
 
 const last = computed(() => runs.value[0] ?? null)
+
+// null 是"调度没在跑"（--web-only 或进程刚起还没排上），空串是还没加载完，两者要分开
+const nextRunLabel = computed(() => {
+  if (!nextRunLoaded.value) return '—'
+  return nextRunAt.value ? new Date(nextRunAt.value).toLocaleString() : '调度未运行'
+})
 
 function summary(run: Run) {
   if (!run.summary_json) return null
@@ -21,6 +28,7 @@ onMounted(load)
 
 async function load() {
   nextRunAt.value = (await api.nextRun()).nextRunAt
+  nextRunLoaded.value = true
   runs.value = (await api.listRuns()).items
 }
 
@@ -55,7 +63,7 @@ async function toggleItems(id: number) {
     <div class="grid">
       <div class="card">
         <span class="label">下次运行</span>
-        <strong>{{ nextRunAt ? new Date(nextRunAt).toLocaleString() : '—' }}</strong>
+        <strong>{{ nextRunLabel }}</strong>
         <div class="row">
           <button :disabled="busy" @click="runNow">立即执行</button>
           <button class="ghost" @click="stop">停止</button>

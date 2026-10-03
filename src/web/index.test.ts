@@ -1,7 +1,9 @@
 ﻿import "../testhelper"
-import { db, reset } from "../testhelper"
+import { db, repo, reset } from "../testhelper"
 import { test, expect, beforeEach } from "bun:test"
 import type { Hono } from "hono"
+import { planNextRun, resetNextRun } from "../scheduler"
+import { DEFAULT_SETTINGS } from "../config"
 import { createApp } from "./index"
 
 const PW = "pw-fixed-1"
@@ -11,6 +13,7 @@ let app: Hono
 beforeEach(() => {
   // 每次都用全新库跑首次初始化流程，避免用例间共享口令哈希
   reset()
+  resetNextRun()
   app = createApp()
 })
 
@@ -102,4 +105,31 @@ test("连续输错口令 5 次后返回 429", async () => {
   })
   expect(res.status).toBe(429)
   expect(db).toBeTruthy()
+})
+
+// 直接往库里塞会话，绕开登录：同一文件前面的用例已经在限流表里留下失败记录，
+// 60 秒窗口内再登录会被 429 挡掉，那样测的就不是 next-run 了。
+async function sessionCookie(): Promise<string> {
+  const token = "test-session-token"
+  repo.saveSession(token, new Date(Date.now() + 3600_000).toISOString())
+  return `session=${token}`
+}
+
+// 回归：/api/next-run 原先每次请求都重新随机取点，刷新页面就变，
+// 而且和调度真正采用的时间不是同一个值。现在只回登记过的那个。
+test("GET /api/next-run 未启动调度时返回 null", async () => {
+  const res = await app.request("/api/next-run", { headers: { cookie: await sessionCookie() } })
+  expect(res.status).toBe(200)
+  expect((await res.json() as { nextRunAt: string | null }).nextRunAt).toBeNull()
+})
+
+test("GET /api/next-run 返回调度登记过的同一个时间，且重复读取稳定", async () => {
+  const cookie = await sessionCookie()
+  const planned = planNextRun(DEFAULT_SETTINGS, new Date())
+  const first = await app.request("/api/next-run", { headers: { cookie } })
+  const second = await app.request("/api/next-run", { headers: { cookie } })
+  const a = (await first.json() as { nextRunAt: string | null }).nextRunAt
+  const b = (await second.json() as { nextRunAt: string | null }).nextRunAt
+  expect(a).toBe(planned.toISOString())
+  expect(b).toBe(a)
 })

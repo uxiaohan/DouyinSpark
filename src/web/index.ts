@@ -17,7 +17,7 @@ import {
   saveSession,
   updateAccount,
 } from "../repo"
-import { computeNextRunAt } from "../scheduler"
+import { getNextRunAt } from "../scheduler"
 import { isRunning, requestStop, runOnce } from "../runner"
 import { log } from "../logger"
 import { sendPushDeer } from "../notify"
@@ -237,10 +237,10 @@ export function createApp(): Hono {
     return c.json({ ok: true })
   })
 
-  app.get("/api/next-run", (c) => {
-    const at = computeNextRunAt(loadSettings())
-    return c.json({ nextRunAt: at.toISOString() })
-  })
+  // 只回调度登记过的那个时间。原来是这里现算，窗口内是 Math.random() 取点，
+  // 每次请求都是新随机数——刷新一次页面数字就变，而且和调度真正采用的时间对不上。
+  // 未启动调度（--web-only）时返回 null，前端据此显示"调度未运行"。
+  app.get("/api/next-run", (c) => c.json({ nextRunAt: getNextRunAt()?.toISOString() ?? null }))
 
   app.post("/api/notify/test", async (c) => {
     const key = loadSettings().pushdeerKey
