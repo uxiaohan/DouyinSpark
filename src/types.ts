@@ -36,7 +36,7 @@ export type RunRow = {
   trigger: string
   started_at: string
   finished_at: string | null
-  status: RunStatus
+  status: RunStatus | "running"
   summary_json: string | null
 }
 
