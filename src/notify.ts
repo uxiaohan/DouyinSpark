@@ -27,7 +27,7 @@ function accountBlock(a: AccountResult): string[] {
 
 export function buildSummaryMarkdown(s: RunSummary): string {
   const out: string[] = [
-    `# 续火花跑批 ${s.status}`,
+    `# 续火花运行 ${s.status}`,
     `触发：${s.trigger} · 开始：${s.startedAt.replace("T", " ").slice(0, 19)} · 结束：${s.finishedAt.replace("T", " ").slice(0, 19)}`,
     "",
     ...s.accounts.flatMap(accountBlock),
@@ -37,7 +37,7 @@ export function buildSummaryMarkdown(s: RunSummary): string {
   return out.join("\n")
 }
 
-/** 失败只告警不抛：通知绝不能反过来影响跑批本身 */
+/** 失败只告警不抛：通知绝不能反过来影响运行本身 */
 export async function sendPushDeer(key: string, text: string, desp: string): Promise<boolean> {
   try {
     const body = new URLSearchParams({ pushkey: key, text, desp, type: "markdown" })
@@ -58,6 +58,6 @@ export async function notifyRun(settings: RuntimeSettings, summary: RunSummary):
   if (summary.status === "aborted") {
     if (!(settings.pushdeerKey && settings.notifyOnAbort)) return
   } else if (!(settings.pushdeerKey && settings.notifyOnRun)) return
-  const ok = await sendPushDeer(settings.pushdeerKey as string, `续火花跑批 ${summary.status}`, buildSummaryMarkdown(summary))
+  const ok = await sendPushDeer(settings.pushdeerKey as string, `续火花运行 ${summary.status}`, buildSummaryMarkdown(summary))
   log.info("notify: 推送完成", { ok, status: summary.status })
 }

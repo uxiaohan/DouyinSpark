@@ -203,7 +203,7 @@ export function createApp(): Hono {
     const name = body?.name
     if (typeof name !== "string" || name.trim().length === 0) return c.json({ error: "备注不能为空" }, 400)
     const accountId = Number(c.req.param("id"))
-    // 同账号下重名直接拒：跑批会命中同一个会话，等于给同一个人发两条。
+    // 同账号下重名直接拒：运行会命中同一个会话，等于给同一个人发两条。
     // 折叠空白后比较，所以 NBSP/全角空格和普通空格算同一个名字；不同账号可以有同名好友。
     const dup = findFriendByName(accountId, name)
     if (dup) return c.json({ error: `该账号下已有同名好友「${dup.name}」` }, 409)
@@ -242,8 +242,8 @@ export function createApp(): Hono {
   app.get("/api/runs/:id/items", (c) => c.json({ items: listRunItems(Number(c.req.param("id"))) }))
 
   app.post("/api/runs/now", (c) => {
-    if (isRunning()) return c.json({ error: "已有跑批在进行中" }, 409)
-    void runOnce("manual").catch((err: unknown) => log.error("手动跑批失败", { err: String(err) }))
+    if (isRunning()) return c.json({ error: "已有运行在进行中" }, 409)
+    void runOnce("manual").catch((err: unknown) => log.error("手动运行失败", { err: String(err) }))
     return c.json({ ok: true })
   })
 

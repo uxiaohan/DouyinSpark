@@ -56,7 +56,7 @@ test("findConversationIndex 返回命中下标，未命中为 -1", () => {
   expect(findConversationIndex([], "张三")).toBe(-1)
 })
 
-// 回归：真实跑批时 allInnerTexts()（底层 $$eval）在虚拟列表重渲染下返回过 undefined，
+// 回归：真实运行时 allInnerTexts()（底层 $$eval）在虚拟列表重渲染下返回过 undefined，
 // matchName 直接 .split 抛 TypeError，把好友记成 failed 并累计连续失败。
 test("会话项文本为 undefined 时不抛，按不匹配处理", () => {
   expect(matchName(undefined, "张三")).toBe(false)
@@ -86,7 +86,7 @@ test("空白归一不放松精确匹配：空格有无仍是两个名字", () =>
  * 最小 Page 假件：驱动 closeChatLayer 的决策分支。
  * 注意：假件的 evaluate 不真在页面里跑回调，所以"闭包自由变量在页面上下文
  * 不存在"这类问题（run 19 真机踩过：SEL is not defined）单元测试拦不住，
- * 只能靠真机跑批验证。这里覆盖的是 reload 兜底/失败不抛/空转三条路径。
+ * 只能靠真机运行验证。这里覆盖的是 reload 兜底/失败不抛/空转三条路径。
  */
 function fakeChatPage(opts: { chatVisible: boolean; reloadOk?: boolean }): { page: Page; stats: { reloads: number } } {
   let visible = opts.chatVisible

@@ -32,7 +32,7 @@ export function requestStop(): void {
   log.warn("收到停止请求，将在当前好友边界停下")
 }
 
-/** 新一轮跑批开始时清掉上一轮的停止标记 */
+/** 新一轮运行开始时清掉上一轮的停止标记 */
 export function resetStop(): void {
   stopRequested = false
 }
@@ -73,7 +73,7 @@ function skippedAll(rt: AccountRuntime, reason: string): AccountResult {
 
 /**
  * 单个好友的发送决策：retryPerFriend 次重试，成功/skip 即停；
- * 连续失败计数在这里维护，达阈值把整个跑批置为 aborted。
+ * 连续失败计数在这里维护，达阈值把整个运行置为 aborted。
  */
 export async function handleFriend(
   friend: FriendRow,
@@ -97,7 +97,7 @@ export async function handleFriend(
     state.consecutiveFail += 1
     if (state.consecutiveFail >= state.settings.limits.consecutiveFailAbort) {
       state.aborted = true
-      log.warn("连续失败达阈值，中止本次跑批", { consecutiveFail: state.consecutiveFail })
+      log.warn("连续失败达阈值，中止本次运行", { consecutiveFail: state.consecutiveFail })
     }
   } else {
     state.consecutiveFail = 0
@@ -125,7 +125,7 @@ export function summarize(
  * 账号的，全局只服务没有专属的账号。专属非空时只用专属池，专属不够就
  * 少发几条，绝不用全局垫数。
  *
- * used 是本轮跑批里**前面好友已经挑走**的文案：同账户多好友优先发不同
+ * used 是本轮运行里**前面好友已经挑走**的文案：同账户多好友优先发不同
  * 的（用户实测两个好友收到同一文案）。专属池被轮空时，还在专属池里随机
  * 抽（用户 21:44 口径：宁可对两个人说同一句专属，也不跳过、也不落全局）。
  * 只有落到全局池时，轮空同样随机补足——没得发比重复更糟。
@@ -242,8 +242,8 @@ async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountR
     const usedTexts = new Set<string>()
     for (const friend of order) {
       if (state.aborted || state.shouldStop()) {
-        result.friends.push({ friendId: friend.id, name: friend.name, status: "skipped", messages: 0, reason: "跑批已停止" })
-        addRunItem({ run_id: state.runId, account_id: account.id, friend_id: friend.id, friend_name: friend.name, status: "skipped", messages: 0, reason: "跑批已停止" })
+        result.friends.push({ friendId: friend.id, name: friend.name, status: "skipped", messages: 0, reason: "运行已停止" })
+        addRunItem({ run_id: state.runId, account_id: account.id, friend_id: friend.id, friend_name: friend.name, status: "skipped", messages: 0, reason: "运行已停止" })
         continue
       }
       const fr = await handleFriend(friend, state, (f) => driveFriend(page, f, messages, fallbackMessages, s, capLeft, usedTexts))
@@ -262,7 +262,7 @@ async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountR
 }
 
 export async function runOnce(trigger = "manual"): Promise<RunSummary> {
-  if (running) throw new Error("已有跑批在进行中")
+  if (running) throw new Error("已有运行在进行中")
   running = true
   resetStop()
   const startedAt = nowISO()
@@ -283,7 +283,7 @@ export async function runOnce(trigger = "manual"): Promise<RunSummary> {
       accounts.push(await runAccount(rt, state))
       if (state.aborted || state.shouldStop()) break
       // 账号间隔只该落在账号之间：最后一个账号后再睡 30-90s 是纯浪费，
-      // 连 notifyRun 推送都一起被拖晚（实测单账号跑批 92.8s 里有 60s 花在这）
+      // 连 notifyRun 推送都一起被拖晚（实测单账号运行 92.8s 里有 60s 花在这）
       if (i < cfg.accounts.length - 1) await sleep(randMs(cfg.settings.gapBetweenAccountsMs))
     }
     summary = summarize(runId, trigger, startedAt, accounts, state.aborted || stopRequested)
@@ -292,7 +292,7 @@ export async function runOnce(trigger = "manual"): Promise<RunSummary> {
     await closeAllBrowsers()
     running = false
   }
-  log.info("跑批完成", { status: summary.status, totals: summary.totals, ms: Date.parse(summary.finishedAt) - Date.parse(summary.startedAt) })
+  log.info("运行完成", { status: summary.status, totals: summary.totals, ms: Date.parse(summary.finishedAt) - Date.parse(summary.startedAt) })
   await notifyRun(loadRunConfig().settings, summary)
   return summary
 }

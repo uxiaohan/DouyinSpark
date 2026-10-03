@@ -190,7 +190,7 @@ onMounted(load)
     <DialogContent class="showcase-dialog" :show-close-button="true">
       <DialogHeader>
         <DialogTitle>新增文案</DialogTitle>
-        <DialogDescription>文案将加入当前选中的发送池，跑批时按挑选策略抽取。</DialogDescription>
+        <DialogDescription>文案将加入当前选中的发送池，运行时按挑选策略抽取。</DialogDescription>
       </DialogHeader>
       <div class="dialog-form">
         <label for="message-text">文案内容</label>

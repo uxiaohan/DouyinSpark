@@ -10,12 +10,12 @@ export type PageMeta = {
 
 export const routeMeta: Record<AppRouteName, PageMeta> = {
   login: { title: '登录', description: '输入控制台口令后继续。', requiresAuth: false },
-  dashboard: { title: '指挥台', description: '跑批状态、调度窗口与最近运行记录。', requiresAuth: true },
+  dashboard: { title: '指挥台', description: '运行状态、调度窗口与最近运行记录。', requiresAuth: true },
   accounts: { title: '账号管理', description: '管理抖音账号、登录态与代理配置。', requiresAuth: true },
   friends: { title: '好友管理', description: '维护每个账号需要续火花的联系人。', requiresAuth: true },
   messages: { title: '文案池', description: '维护全局文案与账号专属文案。', requiresAuth: true },
   settings: { title: '运行设置', description: '调度窗口、发送节奏与通知策略。', requiresAuth: true },
-  logs: { title: '运行日志', description: '追踪每次跑批的执行明细与失败原因。', requiresAuth: true },
+  logs: { title: '运行日志', description: '追踪每次运行的执行明细与失败原因。', requiresAuth: true },
 }
 
 const loginPage = () => import('@/pages/LoginPage.vue')

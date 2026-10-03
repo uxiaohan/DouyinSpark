@@ -27,7 +27,7 @@ const metrics = computed(() => [
   { label: '启用账号', value: String(enabledAccounts.value), note: `共 ${accounts.value.length} 个账号` },
   { label: '续火花好友', value: String(friends.value.length), note: '覆盖全部启用账号' },
   { label: '文案池', value: String(messageCount.value), note: '全局 + 专属文案' },
-  { label: '最近跑批', value: lastRun.value ? runStatusLabel(lastRun.value.status) : '无记录', note: lastRun.value ? formatTime(lastRun.value.started_at) : '尚未执行' },
+  { label: '最近运行', value: lastRun.value ? runStatusLabel(lastRun.value.status) : '无记录', note: lastRun.value ? formatTime(lastRun.value.started_at) : '尚未执行' },
 ])
 
 function runStatusLabel(status: string) {
@@ -79,7 +79,7 @@ async function load() {
 async function runNow() {
   try {
     await api.runNow()
-    toast('已触发一次跑批', 'success')
+    toast('已触发一次运行', 'success')
     await load()
   } catch (err) {
     toast(err instanceof Error ? err.message : '触发失败', 'error')
@@ -89,7 +89,7 @@ async function runNow() {
 async function stop() {
   try {
     await api.stop()
-    toast('已请求停止当前跑批', 'warning')
+    toast('已请求停止当前运行', 'warning')
   } catch (err) {
     toast(err instanceof Error ? err.message : '停止失败', 'error')
   }
@@ -200,8 +200,8 @@ onMounted(async () => {
     </div>
 
     <section class="queue-panel">
-      <div class="queue-head"><div><h2>最近跑批</h2><p>按开始时间倒序</p></div><Button variant="outline" size="sm" @click="router.push({ name: 'logs' })">查看全部</Button></div>
-      <div class="queue-table" role="table" aria-label="最近跑批">
+      <div class="queue-head"><div><h2>最近运行</h2><p>按开始时间倒序</p></div><Button variant="outline" size="sm" @click="router.push({ name: 'logs' })">查看全部</Button></div>
+      <div class="queue-table" role="table" aria-label="最近运行">
         <div v-for="run in runs.slice(0, 6)" :key="run.id" class="queue-row" role="row">
           <span class="queue-status"><i /></span>
           <strong>{{ formatTime(run.started_at) }}</strong>
@@ -212,7 +212,7 @@ onMounted(async () => {
           <Button variant="ghost" size="icon-sm" aria-label="查看明细" @click="router.push({ name: 'logs' })"><ArrowRight /></Button>
         </div>
         <div v-if="runs.length === 0" class="empty-state">
-          <strong>还没有跑批记录</strong>
+          <strong>还没有运行记录</strong>
           <span>点击「立即执行」触发第一次运行</span>
         </div>
       </div>

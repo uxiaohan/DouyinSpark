@@ -3,7 +3,7 @@
 本地自动化"抖音续火花"：每天在一个随机时间窗口内，用每个账号自己的 cookie 登录抖音网页版，
 给该账号的火花好友发随机文案，配一个 Vue3 网页控制台做配置和查看。
 
-跑批引擎是 Bun + Playwright，控制台是 Hono + Vue3，数据存在本地 SQLite（`bun:sqlite`，无外部数据库）。
+运行引擎是 Bun + Playwright，控制台是 Hono + Vue3，数据存在本地 SQLite（`bun:sqlite`，无外部数据库）。
 
 ---
 
@@ -12,7 +12,7 @@
 | 项 | 版本 | 说明 |
 |---|---|---|
 | Bun | 1.4.2 | 项目按这个版本开发和测试 |
-| Chrome | 任意较新版本 | **必须本机安装**。跑批用 `channel: "chrome"` 起真实 Chrome，不依赖 Playwright 自带的 chromium |
+| Chrome | 任意较新版本 | **必须本机安装**。运行用 `channel: "chrome"` 起真实 Chrome，不依赖 Playwright 自带的 chromium |
 | Node | 不需要 | 前端构建由 Bun 驱动 |
 
 依赖只有三个：`playwright`、`hono`、`@types/bun`（dev）。前端额外用 `vue` + `vue-router`。
@@ -48,7 +48,7 @@ bun run web
 - cookie **只写入、不回显**，之后在界面上看到的是掩码。
 - 域名必须含 `douyin`，否则该条 cookie 会被跳过。
 - 保存在本地 `data/app.db`，**不会**进 git（`data/` 已在 `.gitignore`）。
-- cookie 失效后跑批不会崩：该账号的全部好友会被标记 `skipped (cookie 失效)`，其他账号照常跑。
+- cookie 失效后运行不会崩：该账号的全部好友会被标记 `skipped (cookie 失效)`，其他账号照常跑。
 
 ### 加好友和文案
 
@@ -97,14 +97,14 @@ bun run now
 
 ---
 
-## 跑批是怎么跑的
+## 一轮运行是怎么跑的
 
 1. 读取配置，按账号顺序处理；同代理的账号共用一个浏览器实例，各自独立 context。
 2. 每个账号先开首页判断登录态，再点「消息」入口打开 IM 弹层。
 3. 在会话列表里按备注**精确匹配**（空白折叠后）找到好友（虚拟滚动，找不到就滚 `maxScrollAttempts` 次）。
 4. 逐字输入文案（速度按 `typingCps` 随机抖动），**按回车发送**。
 5. 命中验证码/风控文案 → 该好友记 `failed`；连续失败达到 `consecutiveFailAbort` → 中止整批。
-6. 全部跑完按 `notifyOnRun` / `notifyOnAbort` 决定是否推 PushDeer，推送失败不影响跑批结果。
+6. 全部跑完按 `notifyOnRun` / `notifyOnAbort` 决定是否推 PushDeer，推送失败不影响运行结果。
 
 ### 关于发送方式
 
@@ -132,8 +132,8 @@ bun run now
 - 选择器 drift 不会静默失败：会打 `warn` 日志，把该好友记 `skipped (未找到会话)`。
 - 风控检测扫的是整页 body 文本，所以候选文案**不能**收"请稍后再试"这类日常客套
   （好友聊天记录里出现这句话会误判成风控，把好友记 failed 并累计连续失败）。
-- PushDeer 推送失败只记 warning，绝不让跑批崩。
-- `Ctrl+C` 一次：跑批会在当前好友的边界停下；再按一次才强退。
+- PushDeer 推送失败只记 warning，绝不让运行崩。
+- `Ctrl+C` 一次：运行会在当前好友的边界停下；再按一次才强退。
 
 ---
 
@@ -144,7 +144,7 @@ bun run now
 **已验证**
 - 完整 dry-run 链路：登录态判定 → 打开 IM 弹层 → 取会话列表 → 按备注匹配 → 点进会话 → 风控检测 → 停在发送前。
 - 真发一条消息：消息确实出现在聊天记录里（时间戳"刚刚"），输入框无残留草稿。
-- 控制台：登录/登出、设置、账号、好友、文案、跑批记录的读写；静态托管与 SPA 回退。
+- 控制台：登录/登出、设置、账号、好友、文案、运行记录的读写；静态托管与 SPA 回退。
 - 单测 110 项通过（另有 1 项需要真浏览器，默认跳过）。
 
 **未验证（重要）**
@@ -158,20 +158,20 @@ bun run now
 
 - `data/app.db` 里存着全部账号的 cookie 和管理口令哈希，**不要提交、不要外发**（`.gitignore` 已挡）。
 - 管理口令哈希用 bcrypt；登录失败才计限流次数，成功即清零。
-- 控制台默认监听 `0.0.0.0`。它会话持有你的 cookie 和一键跑批开关，暴露在局域网里等于把这些交出去。
+- 控制台默认监听 `0.0.0.0`。它会话持有你的 cookie 和一键运行开关，暴露在局域网里等于把这些交出去。
   只在可信网络里用，或者设 `HOST=127.0.0.1`。
 
 ## 目录
 
 ```
-index.ts             调度/手动跑批入口
+index.ts             调度/手动运行入口
 web-server.ts        控制台服务入口（Hono + 静态托管）
 src/
   db.ts repo.ts      SQLite 与数据访问
   config.ts          设置读写、cookie 解析、指纹
   browser.ts         Playwright 启动与账号页面
   douyin.ts          登录态、会话匹配、输入、发送
-  runner.ts          跑批主循环
+  runner.ts          运行主循环
   scheduler.ts       每日随机窗口
   notify.ts          PushDeer
   selectors.ts       全部 DOM 选择器（漂移时改这里）

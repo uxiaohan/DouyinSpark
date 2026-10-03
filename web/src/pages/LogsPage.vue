@@ -141,14 +141,14 @@ onMounted(load)
         </div>
         <div v-if="filtered.length === 0" class="empty-state">
           <strong>没有匹配的运行记录</strong>
-          <span>调整筛选条件，或先执行一次跑批</span>
+          <span>调整筛选条件，或先执行一次运行</span>
         </div>
       </div>
     </div>
 
     <aside class="security-console">
       <div class="security-visual">
-        <span>累计跑批</span>
+        <span>累计运行</span>
         <strong>{{ stats.total }}</strong>
         <small>成功 {{ stats.success }} · 失败 {{ stats.failed }}</small>
       </div>

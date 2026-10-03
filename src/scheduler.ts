@@ -87,7 +87,7 @@ export function interruptibleSleep(ms: number): Promise<boolean> {
 /**
  * 保存设置后由 web 层调用：打断循环当前的睡眠，并等它按最新 settings
  * 重排完再返回。ack 保证调用方随后读到的 getNextRunAt() 就是新区间
- * 取的点；没在睡（--web-only 或正在跑批）时直接 resolve(false)，无副作用。
+ * 取的点；没在睡（--web-only 或正在运行）时直接 resolve(false)，无副作用。
  */
 export function wakeScheduler(): Promise<boolean> {
   if (!wakeSleep) return Promise.resolve(false)
@@ -113,12 +113,12 @@ export function windowEnd(settings: RuntimeSettings, from = new Date()): Date {
   return end
 }
 
-/** 调度循环依赖：生产环境用默认实现，测试注入假时钟/假跑批驱动它 */
+/** 调度循环依赖：生产环境用默认实现，测试注入假时钟/假运行驱动它 */
 export interface SchedulerDeps {
   now: () => number
-  /** 睡到返回 false；被 wakeScheduler 提前结束返回 true（调用方据此重排而非跑批） */
+  /** 睡到返回 false；被 wakeScheduler 提前结束返回 true（调用方据此重排而非运行） */
   sleep: (ms: number) => Promise<unknown>
-  /** 跑一批；返回值 discarded，跑批结果由 runner 自己落库 */
+  /** 跑一批；返回值 discarded，运行结果由 runner 自己落库 */
   run: () => Promise<unknown>
   loadSettings: () => RuntimeSettings
 }
@@ -152,7 +152,7 @@ export async function schedulerLoop(deps: SchedulerDeps): Promise<never> {
     try {
       await deps.run()
     } catch (err) {
-      log.error("跑批失败，等待下一轮", { err: String(err) })
+      log.error("运行失败，等待下一轮", { err: String(err) })
     }
     // 跑完就避开刚过去那个窗口；窗口已过（这批跑跨过了结束时刻）则不设下界，正常找下一天
     const over = windowEnd(settings, new Date(deps.now()))

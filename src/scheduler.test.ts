@@ -160,7 +160,7 @@ test("循环跑完一批后不会把下一轮排进同一个窗口", async () =>
   let sleeps = 0
   let runs = 0
   class Stop extends Error {}
-  // 假跑批不推进时钟：这样断言才和 Math.random 取到哪个点无关
+  // 假运行不推进时钟：这样断言才和 Math.random 取到哪个点无关
   await expect(
     schedulerLoop({
       now: () => now,
@@ -200,8 +200,8 @@ test("wakeScheduler 在没有睡眠时是安全的空调用", async () => {
 })
 
 // 打断睡眠 ≠ 到点：唤醒那一轮必须回到循环顶部按最新 settings 重排，
-// 绝不跑批。否则用户每次改时间区间都会立刻触发一次跑批。
-test("循环被唤醒后不跑批，按最新 settings 重排下一轮", async () => {
+// 绝不运行。否则用户每次改时间区间都会立刻触发一次运行。
+test("循环被唤醒后不运行，按最新 settings 重排下一轮", async () => {
   const late: RuntimeSettings = { ...S, schedule: { startHour: 22, startMinute: 0, endHour: 23, endMinute: 30 } }
   let reads = 0
   // 第一轮读旧区间，唤醒后的第二轮读到的是刚保存的新区间
@@ -226,7 +226,7 @@ test("循环被唤醒后不跑批，按最新 settings 重排下一轮", async (
       loadSettings,
     } satisfies SchedulerDeps),
   ).rejects.toThrow(Stop)
-  expect(runs).toBe(0) // 唤醒那一轮绝不跑批
+  expect(runs).toBe(0) // 唤醒那一轮绝不运行
   expect(planned).toHaveLength(2)
   // 第一轮排旧区间（次日 8-10），唤醒后重排到新区间（今晚 22-23:30）
   expect(planned[0]!.getDate()).toBe(4)

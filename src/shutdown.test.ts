@@ -5,7 +5,7 @@ test("空闲时收到退出信号直接退出", () => {
   expect(planShutdown(false, false)).toBe("exit")
 })
 
-test("跑批中收到首个信号先收尾", () => {
+test("运行中收到首个信号先收尾", () => {
   expect(planShutdown(true, false)).toBe("drain")
 })
 

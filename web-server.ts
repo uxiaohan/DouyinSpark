@@ -16,7 +16,7 @@ if (existsSync("web/dist")) {
 
 log.info("控制台启动", { port: PORT, staticHosted: existsSync("web/dist"), webOnly: process.argv.includes("--web-only") })
 
-// 上次进程若被硬杀，runs 表里会留下永远"进行中"的行；刚启动没有别人的跑批，全是尸体
+// 上次进程若被硬杀，runs 表里会留下永远"进行中"的行；刚启动没有别人的运行，全是尸体
 const reaped = reapStaleRuns()
 if (reaped > 0) log.info("收尾残留的运行记录", { count: reaped })
 

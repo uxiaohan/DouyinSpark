@@ -16,8 +16,8 @@ function run() {
   window.clearTimeout(timer)
   const metric = parseMetric(props.value)
 
-  // 没有数字的内容（如跑批状态"进行中"）原样显示；否则 formatMetricValue 会拼出
-  // "0进行中"这种怪物——仪表盘"最近跑批"卡踩过这个坑。
+  // 没有数字的内容（如运行状态"进行中"）原样显示；否则 formatMetricValue 会拼出
+  // "0进行中"这种怪物——仪表盘"最近运行"卡踩过这个坑。
   if (metric.prefix === '' && metric.suffix === props.value) {
     display.value = props.value
     return

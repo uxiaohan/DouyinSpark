@@ -95,7 +95,7 @@ async function add() {
 async function remove(friend: Friend) {
   if (activeId.value === null) return
   const ok = await confirmDialog({
-    message: `确认删除好友「${friend.name}」？删除后跑批将不再向其续火花。`,
+    message: `确认删除好友「${friend.name}」？删除后运行将不再向其续火花。`,
     tone: 'warning',
   })
   if (!ok) return

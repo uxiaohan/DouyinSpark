@@ -24,7 +24,7 @@ const { showToast } = useToasts()
 async function runNow() {
   try {
     await api.runNow()
-    showToast('已触发一次跑批', 'success')
+    showToast('已触发一次运行', 'success')
   } catch (err) {
     showToast(err instanceof Error ? err.message : '触发失败', 'error')
   }

@@ -94,7 +94,7 @@ const runs = await call("/api/runs", { headers: auth });
 check("runs", runs.status, 200);
 console.log("     runs:", JSON.stringify(runs.body));
 
-// /api/runs/now 会真的拉起浏览器跑批，这里不触发挥器验证成本；并发互斥由 runner.test.ts 覆盖。
+// /api/runs/now 会真的拉起浏览器运行，这里不触发挥器验证成本；并发互斥由 runner.test.ts 覆盖。
 const stopNoRun = await call("/api/stop", { method: "POST", headers: auth });
 check("stop", stopNoRun.status, 200);
 console.log("     stop(无运行中任务):", stopNoRun.status, JSON.stringify(stopNoRun.body));

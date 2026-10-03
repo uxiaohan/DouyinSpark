@@ -51,7 +51,7 @@ async function handleLogin() {
     </template>
 
     <MotionDiv class="login-access" :initial="{ opacity: 0, y: 6 }" :animate="{ opacity: 1, y: 0 }" :transition="{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }">
-      <div class="login-copy"><h2>登录续火花控制台</h2><p>验证本地口令后继续管理跑批。</p></div>
+      <div class="login-copy"><h2>登录续火花控制台</h2><p>验证本地口令后继续管理运行。</p></div>
       <form class="login-form" @submit.prevent="handleLogin">
         <div class="field-label"><label for="password">控制台口令</label></div>
         <Input id="password" v-model="form.password" type="password" autocomplete="current-password" placeholder="输入口令" class="control-input" />

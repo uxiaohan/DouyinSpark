@@ -154,7 +154,7 @@ onMounted(load)
   <div v-if="loaded" class="components-view">
     <section class="component-section">
       <div class="component-section-head">
-        <div><h2>调度窗口</h2><p>每天在此时段内触发跑批；结束时间不早于开始时间（相等即每天到点跑），时区影响调度与日志展示。</p></div>
+        <div><h2>调度窗口</h2><p>每天在此时段内触发运行；结束时间不早于开始时间（相等即每天到点跑），时区影响调度与日志展示。</p></div>
       </div>
       <div class="component-body component-form-grid">
         <label class="component-field">开始时间
@@ -244,12 +244,12 @@ onMounted(load)
 
     <section class="component-section">
       <div class="component-section-head">
-        <div><h2>通知</h2><p>跑批开始/中止时通过 PushDeer 推送到手机。</p></div>
+        <div><h2>通知</h2><p>运行开始/中止时通过 PushDeer 推送到手机。</p></div>
         <Button variant="outline" size="sm" @click="testNotify"><Zap />测试通知</Button>
       </div>
       <div class="component-body">
         <div class="component-control-row">
-          <span>跑批开始通知（notifyOnRun）</span>
+          <span>运行开始通知（notifyOnRun）</span>
           <label class="console-switch"><input v-model="form.notifyOnRun" type="checkbox" /><i /></label>
         </div>
         <div class="component-control-row">
@@ -264,7 +264,7 @@ onMounted(load)
     </section>
 
     <div class="feedback-status">
-      <span><i />设置修改后对下一次跑批生效</span>
+      <span><i />设置修改后对下一次运行生效</span>
       <Button class="primary-action" :disabled="saving || scheduleError !== ''" @click="save"><Save />{{ saving ? '保存中' : '保存设置' }}</Button>
     </div>
   </div>

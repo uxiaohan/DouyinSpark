@@ -7,7 +7,7 @@ export type ShutdownPlan = "drain" | "force" | "exit"
 /**
  * 收到退出信号时的动作：
  * - 空闲：直接关浏览器退出；
- * - 跑批中：先让跑批在当前好友边界收尾（requestStop），否则硬杀会把
+ * - 运行中：先让运行在当前好友边界收尾（requestStop），否则硬杀会把
  *   输入到一半的消息和未 finishRun 的运行记录留在半路；
  * - 第二次信号：不再等，强制退出。
  */
