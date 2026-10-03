@@ -232,11 +232,13 @@ export async function runOnce(trigger = "manual"): Promise<RunSummary> {
       shouldStop: () => stopRequested,
     }
     const accounts: AccountResult[] = []
-    for (const rt of cfg.accounts) {
+    for (const [i, rt] of cfg.accounts.entries()) {
       if (state.aborted || state.shouldStop()) break
       accounts.push(await runAccount(rt, state))
       if (state.aborted || state.shouldStop()) break
-      await sleep(randMs(cfg.settings.gapBetweenAccountsMs))
+      // 账号间隔只该落在账号之间：最后一个账号后再睡 30-90s 是纯浪费，
+      // 连 notifyRun 推送都一起被拖晚（实测单账号跑批 92.8s 里有 60s 花在这）
+      if (i < cfg.accounts.length - 1) await sleep(randMs(cfg.settings.gapBetweenAccountsMs))
     }
     summary = summarize(runId, trigger, startedAt, accounts, state.aborted || stopRequested)
     finishRun(runId, summary.status, summary)
