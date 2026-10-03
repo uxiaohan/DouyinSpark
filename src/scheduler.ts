@@ -1,5 +1,6 @@
 import { loadSettings } from "./config"
 import { log } from "./logger"
+import { runOnce } from "./runner"
 import type { RuntimeSettings } from "./types"
 import { sleep } from "./util"
 
@@ -32,7 +33,10 @@ export async function startScheduler(): Promise<never> {
     const next = computeNextRunAt(loadSettings())
     log.info("scheduler: 下次运行", { at: next.toISOString() })
     await sleep(Math.max(0, next.getTime() - Date.now()))
-    // TODO(Task 6/8): await runOnce("schedule")
-    log.info("scheduler: 到达触发时间", { at: new Date().toISOString() })
+    try {
+      await runOnce("schedule")
+    } catch (err) {
+      log.error("跑批失败，等待下一轮", { err: String(err) })
+    }
   }
 }

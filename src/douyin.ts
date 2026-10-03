@@ -1,4 +1,4 @@
-import type { Locator, Page } from "playwright"
+﻿import type { Locator, Page } from "playwright"
 import { log } from "./logger"
 import { SEL } from "./selectors"
 import type { SendKey } from "./types"
@@ -17,12 +17,13 @@ export function findConversationIndex(texts: string[], name: string): number {
   return texts.findIndex((t) => matchName(t, name))
 }
 
-/** 选择器漂移的兜底：逐个候选尝试，取第一个可见项；全不可见返回 null */
-async function firstVisible(page: Page, selectors: readonly string[]): Promise<Locator | null> {
+/** 选择器漂移的兜底：逐个候选等待可见，取第一个；全不可见返回 null */
+async function firstVisible(page: Page, selectors: readonly string[], timeout = 1500): Promise<Locator | null> {
   for (const sel of selectors) {
     const loc = page.locator(sel).first()
     try {
-      if (await loc.isVisible({ timeout: 1500 })) return loc
+      await loc.waitFor({ state: "visible", timeout })
+      return loc
     } catch {
       /* 该候选无效/不可见，试下一个 */
     }
@@ -30,17 +31,21 @@ async function firstVisible(page: Page, selectors: readonly string[]): Promise<L
   return null
 }
 
+/** 文案是否可见：getByText 的字符串是字面匹配，多个文案必须传 RegExp */
+async function textVisible(page: Page, re: RegExp, timeout = 2000): Promise<boolean> {
+  try {
+    await page.getByText(re).first().waitFor({ state: "visible", timeout })
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function ensureLoggedIn(page: Page): Promise<boolean> {
   await page.goto(SEL.homeUrl, { waitUntil: "domcontentloaded" })
-  await sleep(1500)
+  await sleep(1000)
   if (page.url().includes("login")) return false
-  const login = page.getByText(SEL.loginText.join("|")).first()
-  try {
-    if (await login.isVisible({ timeout: 2000 })) return false
-  } catch {
-    /* 未找到登录入口文案 */
-  }
-  return true
+  return !(await textVisible(page, new RegExp(SEL.loginText.join("|"))))
 }
 
 export async function detectBlocked(page: Page): Promise<string | null> {
@@ -61,7 +66,7 @@ export async function detectBlocked(page: Page): Promise<string | null> {
 export async function openConversation(page: Page, friendName: string, maxScroll: number): Promise<boolean> {
   let list = await firstVisible(page, SEL.conversationList)
   if (!list) {
-    const entry = page.getByText(SEL.messageEntryText.join("|")).first()
+    const entry = page.getByText(new RegExp(SEL.messageEntryText.join("|"))).first()
     try {
       await entry.click({ timeout: 5000 })
       await sleep(1500)
@@ -137,3 +142,4 @@ export async function sendCurrentDraft(page: Page, sendKey: SendKey): Promise<vo
   if (sendKey === "Click") throw new Error("未找到发送按钮")
   await page.keyboard.press("Enter")
 }
+

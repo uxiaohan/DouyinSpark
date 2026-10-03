@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 校准探针：bun run calibrate
  * 用首个启用账号打开抖音，dump 候选按钮/可编辑元素与各候选选择器的命中数，
  * 截图落到 logs/calibrate.png，据此回填 src/selectors.ts。
@@ -24,7 +24,7 @@ try {
   if (blocked) log.warn("calibrate: 命中风控/验证码", { blocked })
 
   // 进入消息页，dump 更有价值
-  const entry = page.getByText(SEL.messageEntryText.join("|")).first()
+  const entry = page.getByText(new RegExp(SEL.messageEntryText.join("|"))).first()
   try {
     await entry.click({ timeout: 5000 })
     await page.waitForTimeout(1500)
@@ -44,7 +44,10 @@ try {
     for (const sel of value as readonly string[]) {
       let count = -1
       try {
-        count = await page.locator(sel).count()
+        // 文案类字段用文本匹配统计，CSS 字段才用 locator.count()
+        count = /^[a-zA-Z[#.*:\[(]/.test(sel)
+          ? await page.locator(sel).count()
+          : await page.getByText(sel).count()
       } catch (err) {
         console.log(`  ${field}: ${sel} -> 非法选择器 (${String(err).slice(0, 80)})`)
         continue
@@ -59,3 +62,4 @@ try {
 } finally {
   await closeAllBrowsers()
 }
+
