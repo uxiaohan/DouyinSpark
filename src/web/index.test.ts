@@ -179,3 +179,30 @@ test("PUT /api/settings 保存修改并返回 nextRunAt 字段", async () => {
   const after = await app.request("/api/settings", { headers: { cookie } })
   expect(((await after.json()) as RuntimeSettings).schedule.startHour).toBe(22)
 })
+
+// 结束早于开始的区间会被调度误解读成跨零点 24 小时窗口（用户实测误存
+// 0:16–0:13，下次运行跳到当晚 21:36）。PUT 必须硬拒且不落库，库里旧值不动。
+test("PUT /api/settings 拒绝结束早于开始的区间且不落库", async () => {
+  const cookie = await sessionCookie()
+  const legal = { ...DEFAULT_SETTINGS, schedule: { startHour: 8, startMinute: 0, endHour: 10, endMinute: 0 } }
+  expect(
+    (
+      await app.request("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify(legal),
+        headers: { "content-type": "application/json", cookie },
+      })
+    ).status,
+  ).toBe(200)
+
+  const res = await app.request("/api/settings", {
+    method: "PUT",
+    body: JSON.stringify({ ...DEFAULT_SETTINGS, schedule: { startHour: 0, startMinute: 16, endHour: 0, endMinute: 13 } }),
+    headers: { "content-type": "application/json", cookie },
+  })
+  expect(res.status).toBe(400)
+  expect(((await res.json()) as { error: string }).error).toContain("结束时间不能早于开始时间")
+  // 被拒后库里还是先前的合法区间
+  const after = await app.request("/api/settings", { headers: { cookie } })
+  expect(((await after.json()) as RuntimeSettings).schedule).toEqual(legal.schedule)
+})

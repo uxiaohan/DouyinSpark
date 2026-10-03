@@ -82,6 +82,23 @@ test("saveSettings / loadSettings 往返", () => {
   expect(back.limits.retryPerFriend).toBe(7)
 })
 
+test("validateSchedule 拒绝结束早于开始（跨零点窗口不可保存）", () => {
+  // 用户实测误存过 0:16–0:13：computeNextRunAt 将其当成 24 小时窗口，下次运行跳到当晚
+  expect(config.validateSchedule({ startHour: 0, startMinute: 16, endHour: 0, endMinute: 13 })).not.toBeNull()
+  expect(config.validateSchedule({ startHour: 22, startMinute: 0, endHour: 6, endMinute: 0 })).not.toBeNull()
+})
+
+test("validateSchedule 允许结束等于开始", () => {
+  expect(config.validateSchedule({ startHour: 8, startMinute: 30, endHour: 8, endMinute: 30 })).toBeNull()
+  expect(config.validateSchedule({ startHour: 20, startMinute: 6, endHour: 20, endMinute: 10 })).toBeNull()
+})
+
+test("validateSchedule 拒绝越界与非整数钟点", () => {
+  expect(config.validateSchedule({ startHour: 24, startMinute: 0, endHour: 23, endMinute: 0 })).not.toBeNull()
+  expect(config.validateSchedule({ startHour: 8, startMinute: 60, endHour: 9, endMinute: 0 })).not.toBeNull()
+  expect(config.validateSchedule({ startHour: 8.5, startMinute: 0, endHour: 9, endMinute: 0 })).not.toBeNull()
+})
+
 test("updateAccount 可改别名且不影响其它账号", () => {
   const id = createAccount({ alias: "before" })
   updateAccount(id, { alias: "after" })

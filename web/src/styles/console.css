@@ -33,6 +33,12 @@
 .timeline-row.is-expanded .timeline-axis i { bottom: 0; }
 .timeline-row .dialog-log { margin-top: 8px; }
 
+/* 时间选择器面板（components/ui/time-picker）：细滚动条贴合控制台浅色风格 */
+.console-time-scroll { max-height: 196px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d3d6dc transparent; }
+.console-time-scroll::-webkit-scrollbar { width: 4px; }
+.console-time-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: #d3d6dc; }
+.console-time-scroll::-webkit-scrollbar-track { background: transparent; }
+
 @media (max-width: 640px) {
   .console-actions { flex-wrap: wrap; }
   .console-tabs { overflow-x: auto; }

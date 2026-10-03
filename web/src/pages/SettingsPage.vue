@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Save, Zap } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { api, type Settings } from '@/api'
 
 const emit = defineEmits<{ toast: [message: string, tone?: 'success' | 'info' | 'warning' | 'error'] }>()
@@ -15,10 +16,8 @@ const saving = ref(false)
 
 const form = reactive({
   timezone: 'Asia/Shanghai',
-  startHour: 20,
-  startMinute: 6,
-  endHour: 20,
-  endMinute: 10,
+  startTime: '20:06',
+  endTime: '20:10',
   perMin: 1,
   perMax: 3,
   messageGapMin: 60000,
@@ -41,10 +40,20 @@ const form = reactive({
   notifyOnAbort: true,
 })
 
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** "HH:MM" → 时/分；TimePicker 只产出零填充值，split 后的兜底仅供防御 */
+function parseClock(v: string): { hour: number; minute: number } {
+  const [h, m] = v.split(':').map(Number)
+  return { hour: h || 0, minute: m || 0 }
+}
+
 function toSettings(): Settings {
+  const start = parseClock(form.startTime)
+  const end = parseClock(form.endTime)
   return {
     timezone: form.timezone,
-    schedule: { startHour: form.startHour, startMinute: form.startMinute, endHour: form.endHour, endMinute: form.endMinute },
+    schedule: { startHour: start.hour, startMinute: start.minute, endHour: end.hour, endMinute: end.minute },
     perFriendMessages: [form.perMin, form.perMax],
     dedupeMessagesPerFriend: form.dedupeMessagesPerFriend,
     shuffleFriends: form.shuffleFriends,
@@ -63,10 +72,8 @@ function toSettings(): Settings {
 
 function fromSettings(s: Settings) {
   form.timezone = s.timezone
-  form.startHour = s.schedule.startHour
-  form.startMinute = s.schedule.startMinute
-  form.endHour = s.schedule.endHour
-  form.endMinute = s.schedule.endMinute
+  form.startTime = `${pad(s.schedule.startHour)}:${pad(s.schedule.startMinute)}`
+  form.endTime = `${pad(s.schedule.endHour)}:${pad(s.schedule.endMinute)}`
   form.perMin = s.perFriendMessages[0]
   form.perMax = s.perFriendMessages[1]
   form.messageGapMin = s.gapBetweenMessagesMs[0]
@@ -98,7 +105,20 @@ async function load() {
   }
 }
 
+// 结束不早于开始的硬约束：跨零点区间曾被 computeNextRunAt 当成 24 小时窗口，
+// 用户实测误存 0:16–0:13 后下次运行跳到当晚 21:36——不是想要的语义，禁止保存。
+// 零填充 "HH:MM" 字典序即时间序；TimePicker 与 fromSettings 都保证零填充。
+const scheduleError = computed(() => {
+  if (!/^\d{2}:\d{2}$/.test(form.startTime) || !/^\d{2}:\d{2}$/.test(form.endTime)) return '请选择开始与结束时间'
+  if (form.endTime < form.startTime) return '结束时间不能早于开始时间（不支持跨零点窗口）'
+  return ''
+})
+
 async function save() {
+  if (scheduleError.value) {
+    toast(scheduleError.value, 'error')
+    return
+  }
   saving.value = true
   try {
     // 保存即重排：后端已按新区间重新取点，直接把新时间提示给用户
@@ -134,20 +154,15 @@ onMounted(load)
   <div v-if="loaded" class="components-view">
     <section class="component-section">
       <div class="component-section-head">
-        <div><h2>调度窗口</h2><p>每天在此时段内触发跑批，时区影响调度与日志展示。</p></div>
+        <div><h2>调度窗口</h2><p>每天在此时段内触发跑批；结束时间不早于开始时间（相等即每天到点跑），时区影响调度与日志展示。</p></div>
       </div>
       <div class="component-body component-form-grid">
-        <label class="component-field">开始小时
-          <input v-model.number="form.startHour" class="console-number" type="number" min="0" max="23" />
+        <label class="component-field">开始时间
+          <TimePicker v-model="form.startTime" aria-label="选择开始时间" />
         </label>
-        <label class="component-field">开始分钟
-          <input v-model.number="form.startMinute" class="console-number" type="number" min="0" max="59" />
-        </label>
-        <label class="component-field">结束小时
-          <input v-model.number="form.endHour" class="console-number" type="number" min="0" max="23" />
-        </label>
-        <label class="component-field">结束分钟
-          <input v-model.number="form.endMinute" class="console-number" type="number" min="0" max="59" />
+        <label class="component-field">结束时间
+          <TimePicker v-model="form.endTime" aria-label="选择结束时间" />
+          <small v-if="scheduleError" class="field-error">{{ scheduleError }}</small>
         </label>
         <label class="component-field">时区
           <input v-model="form.timezone" class="console-number" type="text" placeholder="Asia/Shanghai" />
@@ -250,7 +265,7 @@ onMounted(load)
 
     <div class="feedback-status">
       <span><i />设置修改后对下一次跑批生效</span>
-      <Button class="primary-action" :disabled="saving" @click="save"><Save />{{ saving ? '保存中' : '保存设置' }}</Button>
+      <Button class="primary-action" :disabled="saving || scheduleError !== ''" @click="save"><Save />{{ saving ? '保存中' : '保存设置' }}</Button>
     </div>
   </div>
 </template>

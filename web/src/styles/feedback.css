@@ -12,7 +12,9 @@
 .component-sample-row [data-slot="button"] { min-width: 88px; }
 .component-sample-row [data-slot="button"][data-size^="icon"] { min-width: 0; }
 .component-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; row-gap: 16px; }
-.component-field { display: grid; min-width: 0; gap: 6px; color: #4d5059; font-size: 13px; font-weight: 590; }
+/* align-content: start 不能省：栅格里同行字段被拉伸到等高时，默认的 stretch 会把自由空间
+   平分进行内把输入框挤下去——结束时间的报错 small 一出现，开始时间的选择器就低 12px。 */
+.component-field { display: grid; min-width: 0; gap: 6px; align-content: start; color: #4d5059; font-size: 13px; font-weight: 590; }
 .component-field [data-slot="input"],
 .component-field [data-slot="textarea"] { border-radius: 6px; background: #fff; font-size: 13px; }
 .component-field [data-slot="textarea"] { min-height: 72px; resize: vertical; }

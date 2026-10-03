@@ -1,5 +1,5 @@
 import { Hono } from "hono"
-import { loadSettings, saveSettings } from "../config"
+import { loadSettings, saveSettings, validateSchedule } from "../config"
 import {
   createAccount,
   createFriend,
@@ -122,6 +122,9 @@ export function createApp(): Hono {
   app.put("/api/settings", async (c) => {
     const body = (await c.req.json().catch(() => null)) as RuntimeSettings | null
     if (!body || typeof body !== "object") return c.json({ error: "无效的配置" }, 400)
+    // 结束早于开始的区间会被调度误解读成跨零点 24 小时窗口，保存前硬拦截（前端同有此校验）
+    const invalid = validateSchedule(body.schedule)
+    if (invalid) return c.json({ error: invalid }, 400)
     saveSettings(body)
     // 保存即重排：唤醒调度循环按新区间重新取点并登记。只落库不唤醒的话，
     // 循环睡在旧区间算出的时长上，新区间要等这一觉睡完再跑一批才生效；

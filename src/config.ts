@@ -76,6 +76,22 @@ function readClock(v: unknown, min: number, max: number, def: number): number {
   return typeof v === "number" && Number.isInteger(v) && v >= min && v <= max ? v : def
 }
 
+/**
+ * 调度窗口合法性：时/分为范围内整数，且结束不早于开始。供 PUT /api/settings
+ * 保存前拦截——结束早于开始会被 computeNextRunAt 的跨零点分支当成 24 小时
+ * 窗口（用户实测误存 0:16–0:13，下次运行跳到当晚 21:36），语义不是用户
+ * 想要的。历史数据里的跨零点值仍被 computeNextRunAt 兼容，这里只管新保存。
+ */
+export function validateSchedule(s: RuntimeSettings["schedule"]): string | null {
+  const clk = (v: unknown, min: number, max: number) => typeof v === "number" && Number.isInteger(v) && v >= min && v <= max
+  if (!clk(s?.startHour, 0, 23) || !clk(s?.endHour, 0, 23)) return "开始/结束小时需为 0–23 的整数"
+  if (!clk(s?.startMinute, 0, 59) || !clk(s?.endMinute, 0, 59)) return "开始/结束分钟需为 0–59 的整数"
+  if (s.endHour * 60 + s.endMinute < s.startHour * 60 + s.startMinute) {
+    return "结束时间不能早于开始时间（不支持跨零点窗口）"
+  }
+  return null
+}
+
 export function loadSettings(): RuntimeSettings {
   const d = DEFAULT_SETTINGS
   const sched = (readJSON("schedule") ?? {}) as Record<string, unknown>
