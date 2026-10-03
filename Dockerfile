@@ -10,6 +10,12 @@ COPY web/package.json web/bun.lock ./web/
 RUN cd web && bun install --frozen-lockfile
 
 FROM deps AS builder
+# vue-tsc 靠猴子补丁 fs.readFileSync 改写 tsc 源码来注入 Vue 语言插件，只有 Node 运行时生效；
+# bun 在 Linux 下生成的 .bin 启动器用 bun 运行时跑脚本，补丁会静默失效，
+# 表现为所有 .vue 导入报 TS2307（Windows 的 .bin/vue-tsc.exe 走 Node，所以本地发现不了）
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN bun run build:web
 

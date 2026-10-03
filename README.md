@@ -13,7 +13,7 @@
 |---|---|---|
 | Bun | 1.4.2 | 项目按这个版本开发和测试 |
 | Chrome | 任意较新版本 | **必须本机安装**。运行用 `channel: "chrome"` 起真实 Chrome，不依赖 Playwright 自带的 chromium |
-| Node | 不需要 | 前端构建由 Bun 驱动 |
+| Node | ≥ 18 | 前端类型检查必须用它：`vue-tsc` 靠补丁 `fs.readFileSync` 给 tsc 注入 Vue 插件，只在 Node 运行时生效。Bun 运行时下补丁失效，所有 `.vue` 导入会报 TS2307（后端和 `vite build` 仍由 Bun 驱动） |
 
 依赖只有三个：`playwright`、`hono`、`@types/bun`（dev）。前端额外用 `vue` + `vue-router`。
 
