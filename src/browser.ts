@@ -9,10 +9,19 @@ export type AccountPage = { context: BrowserContext; page: Page }
 
 const browsers = new Map<string, Browser>()
 
+/**
+ * 容器标识（Dockerfile 注入 DOUYIN_CONTAINER=1）：
+ * - 镜像里没有系统 Chrome，跳过必然失败的 channel 探测，直接起内置 chromium；
+ * - 默认 seccomp 下 Chromium 的 zygote 沙箱起不来，必须显式关掉。
+ * 宿主（尤其 Windows）仍维持原逻辑：优先真实 Chrome，失败回退内置 chromium。
+ */
+const CONTAINER = process.env.DOUYIN_CONTAINER === "1"
+
 const LAUNCH_ARGS = [
   "--disable-blink-features=AutomationControlled",
   "--no-default-browser-check",
   "--disable-dev-shm-usage",
+  ...(CONTAINER ? ["--no-sandbox", "--disable-setuid-sandbox"] : []),
 ]
 
 function proxyKey(proxy: ProxySetting | null): string {
@@ -27,6 +36,8 @@ async function launch(proxy: ProxySetting | null): Promise<Browser> {
       ? { server: proxy.server, username: proxy.username ?? undefined, password: proxy.password ?? undefined }
       : undefined,
   }
+  // 容器里镜像没装系统 Chrome，直接走内置 chromium，省掉一次必然失败的探测
+  if (CONTAINER) return await chromium.launch(base)
   try {
     return await chromium.launch({ ...base, channel: "chrome" })
   } catch (err) {

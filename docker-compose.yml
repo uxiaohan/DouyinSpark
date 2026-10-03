@@ -1,0 +1,24 @@
+# DouyinSpark 控制台：容器常驻，调度循环随容器一起活着；数据在命名卷里，重建不丢
+services:
+  douyinspark:
+    build: .
+    image: douyinspark:latest
+    container_name: douyinspark
+    restart: unless-stopped
+    # Chromium 默认只用 64MB /dev/shm，页面一复杂就崩；放大到 1GB
+    shm_size: "1gb"
+    ports:
+      - "${DOUYIN_PORT:-8787}:8787"
+    environment:
+      TZ: "${DOUYIN_TZ:-Asia/Shanghai}"
+    volumes:
+      - douyinspark-data:/app/data
+    # 容器日志不设上限会把磁盘吃光；滚动保留最近 3 份 10MB
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  douyinspark-data:

@@ -17,6 +17,8 @@
 
 依赖只有三个：`playwright`、`hono`、`@types/bun`（dev）。前端额外用 `vue` + `vue-router`。
 
+用 Docker 部署则本机不需要 Bun、Node 和 Chrome，见下文「Docker 部署」。
+
 ```bash
 bun install
 ```
@@ -94,6 +96,39 @@ bun run now
 | `HOST` | `0.0.0.0` | 监听地址。**默认全网卡**，局域网内任何人都能访问到登录页；只想本机访问就设 `127.0.0.1` |
 | `HEADFUL` | 空 | 设成 `1` 显示浏览器窗口，方便眼看过程 |
 | `PLAYWRIGHT` | 空 | 设成 `1` 才跑需要真浏览器的单测 |
+| `DOUYIN_CONTAINER` | 空 | 设成 `1` 时浏览器加 `--no-sandbox` 并跳过系统 Chrome 探测（Docker 镜像默认注入） |
+
+---
+
+## Docker 部署
+
+整套跑在容器里，不依赖本机的 Bun / Chrome：多阶段构建（依赖 → 前端构建 → 运行镜像），
+运行镜像里只带生产依赖 + 内置 chromium（多架构 amd64/arm64）。
+
+```bash
+# 构建并启动（首次会拉基础镜像、装 chromium 系统库，几分钟）
+docker compose up -d --build
+
+# 看日志，确认出现 "scheduler: 下次运行" 即调度循环就绪
+docker compose logs -f
+```
+
+启动后访问 `http://<机器IP>:8787`。首次登录同本地：随便输一个口令即成为管理口令。
+
+| 项 | 说明 |
+|---|---|
+| 数据 | 全在命名卷 `douyinspark-data`（对应容器内 `/app/data`）。`docker compose down` 不丢数据，`down -v` 才会删卷 |
+| 时区 | 固定 `TZ=Asia/Shanghai`。调度窗口按容器本地时间算，改 TZ 会让每天运行点整体漂移 |
+| 手动跑一批 | `docker compose exec douyinspark bun run now` |
+| 迁移旧数据 | 把本机 `data/app.db`（含 wal/shm）拷进卷：先 `docker compose down`，`docker cp data/app.db douyinspark:/app/data/app.db`，再 `docker compose up -d` |
+| 换端口 | `DOUYIN_PORT=9000 docker compose up -d` |
+| 停机 | `docker stop` 发 SIGTERM，会等当前好友边界收尾再退出（优雅停机，最多 2 分钟）；容器内再次收到信号才强制退 |
+| 日志 | json-file 滚动：单文件上限 10MB，保留 3 份 |
+
+和本机跑的两点差异：
+
+1. 浏览器用镜像内置的 chromium，不是本机 Chrome。指纹与真实 Chrome 略有差异，首次建议保持 `dryRun = true` 在「设置」页观察一轮。
+2. `HEADFUL=1` 在容器里无意义（没有显示环境），容器内始终 headless。
 
 ---
 
