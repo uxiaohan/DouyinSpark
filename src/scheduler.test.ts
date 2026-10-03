@@ -2,7 +2,7 @@ import "./testhelper"
 import { test, expect, beforeEach } from "bun:test"
 import { DEFAULT_SETTINGS } from "./config"
 import type { RuntimeSettings } from "./types"
-import { computeNextRunAt, getNextRunAt, planNextRun, resetNextRun, schedulerLoop } from "./scheduler"
+import { computeNextRunAt, getNextRunAt, interruptibleSleep, planNextRun, resetNextRun, schedulerLoop, wakeScheduler } from "./scheduler"
 import type { SchedulerDeps } from "./scheduler"
 
 const S: RuntimeSettings = {
@@ -152,4 +152,54 @@ test("循环跑完一批后不会把下一轮排进同一个窗口", async () =>
   // 第二轮必须排到次日窗口，而不是今天 20:0x——那正是线上连跑两轮的形状
   expect(planned[1]!.getDate()).toBe(4)
   expect(within(planned[1]!, new Date(2026, 9, 4, 20, 0), new Date(2026, 9, 4, 20, 3))).toBe(true)
+})
+
+// 保存设置后 PUT /api/settings 调 wakeScheduler 打断睡眠；定时到点是 false。
+// 唤醒的意义：循环正睡在旧区间算出的时长上，不打断的话新区间要等这一觉
+// 睡完再跑一批才生效（那时用户改的时间早过了）。
+test("interruptibleSleep 被 wakeScheduler 提前结束返回 true，不等满时长", async () => {
+  const t0 = Date.now()
+  const slept = interruptibleSleep(60_000)
+  // ack 要等调度循环重排后才触发，本用例不起循环，不等 wakeScheduler 的 promise
+  void wakeScheduler()
+  expect(await slept).toBe(true)
+  expect(Date.now() - t0).toBeLessThan(5_000) // 不是真等了 60s
+})
+
+test("wakeScheduler 在没有睡眠时是安全的空调用", async () => {
+  expect(await wakeScheduler()).toBe(false)
+})
+
+// 打断睡眠 ≠ 到点：唤醒那一轮必须回到循环顶部按最新 settings 重排，
+// 绝不跑批。否则用户每次改时间区间都会立刻触发一次跑批。
+test("循环被唤醒后不跑批，按最新 settings 重排下一轮", async () => {
+  const late: RuntimeSettings = { ...S, schedule: { startHour: 22, startMinute: 0, endHour: 23, endMinute: 30 } }
+  let reads = 0
+  // 第一轮读旧区间，唤醒后的第二轮读到的是刚保存的新区间
+  const loadSettings = () => (++reads === 1 ? S : late)
+  const planned: Date[] = []
+  let sleeps = 0
+  let runs = 0
+  class Stop extends Error {}
+  await expect(
+    schedulerLoop({
+      now: () => new Date(2026, 9, 3, 21, 0, 0, 0).getTime(), // 21:00，旧区间 8-10 早过了
+      sleep: async () => {
+        const at = getNextRunAt()
+        if (at) planned.push(at)
+        // 第一次睡眠模拟被 wakeScheduler 打断；第二次到点前抛 Stop 收尾
+        if (++sleeps === 1) return true
+        throw new Stop()
+      },
+      run: async () => {
+        runs++
+      },
+      loadSettings,
+    } satisfies SchedulerDeps),
+  ).rejects.toThrow(Stop)
+  expect(runs).toBe(0) // 唤醒那一轮绝不跑批
+  expect(planned).toHaveLength(2)
+  // 第一轮排旧区间（次日 8-10），唤醒后重排到新区间（今晚 22-23:30）
+  expect(planned[0]!.getDate()).toBe(4)
+  expect(within(planned[1]!, at(22, 0), at(23, 30))).toBe(true)
 })

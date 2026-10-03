@@ -18,7 +18,7 @@ import {
   saveSession,
   updateAccount,
 } from "../repo"
-import { getNextRunAt } from "../scheduler"
+import { getNextRunAt, wakeScheduler } from "../scheduler"
 import { isRunning, requestStop, runOnce } from "../runner"
 import { log } from "../logger"
 import { sendPushDeer } from "../notify"
@@ -123,7 +123,12 @@ export function createApp(): Hono {
     const body = (await c.req.json().catch(() => null)) as RuntimeSettings | null
     if (!body || typeof body !== "object") return c.json({ error: "无效的配置" }, 400)
     saveSettings(body)
-    return c.json(loadSettings())
+    // 保存即重排：唤醒调度循环按新区间重新取点并登记。只落库不唤醒的话，
+    // 循环睡在旧区间算出的时长上，新区间要等这一觉睡完再跑一批才生效；
+    // 而循环醒来时又会用 now 重算，把保存方提前登记的值覆盖掉——必须唤醒。
+    // wakeScheduler 等循环重排登记完成后才返回，这里读到的即最终值。
+    await wakeScheduler()
+    return c.json({ ...loadSettings(), nextRunAt: getNextRunAt()?.toISOString() ?? null })
   })
 
   /** 不回显 cookie 原文；只暴露 hasCookie 标志 */

@@ -76,7 +76,8 @@ export const api = {
   logout: () => req<{ ok: true }>('/logout', { method: 'POST' }),
 
   getSettings: () => req<Settings>('/settings'),
-  putSettings: (s: Settings) => req<Settings>('/settings', { method: 'PUT', body: JSON.stringify(s) }),
+  // 保存后后端已按新区间重排，返回新登记的下次运行时间（未调度时为 null）
+  putSettings: (s: Settings) => req<Settings & { nextRunAt: string | null }>('/settings', { method: 'PUT', body: JSON.stringify(s) }),
 
   listAccounts: () => req<{ items: Account[] }>('/accounts'),
   createAccount: (a: Partial<Account> & { alias: string; cookie_json?: string; proxy_server?: string; proxy_username?: string; proxy_password?: string }) =>

@@ -4,6 +4,7 @@ import { test, expect, beforeEach } from "bun:test"
 import type { Hono } from "hono"
 import { planNextRun, resetNextRun } from "../scheduler"
 import { DEFAULT_SETTINGS } from "../config"
+import type { RuntimeSettings } from "../types"
 import { createApp } from "./index"
 
 const PW = "pw-fixed-1"
@@ -157,4 +158,24 @@ test("GET /api/next-run 返回调度登记过的同一个时间，且重复读�
   const b = (await second.json() as { nextRunAt: string | null }).nextRunAt
   expect(a).toBe(planned.toISOString())
   expect(b).toBe(a)
+})
+
+// 保存时间区间即重排：PUT 落库后唤醒调度循环按新区间重新取点。响应带
+// nextRunAt 让设置页立刻提示用户新的下次运行时间。测试里不起调度循环，
+// wakeScheduler 空转，字段仍要在（null），否则前端拿到 undefined。
+test("PUT /api/settings 保存修改并返回 nextRunAt 字段", async () => {
+  const cookie = await sessionCookie()
+  const res = await app.request("/api/settings", {
+    method: "PUT",
+    body: JSON.stringify({ ...DEFAULT_SETTINGS, schedule: { startHour: 22, startMinute: 30, endHour: 23, endMinute: 45 } }),
+    headers: { "content-type": "application/json", cookie },
+  })
+  expect(res.status).toBe(200)
+  const body = (await res.json()) as RuntimeSettings & { nextRunAt: string | null }
+  expect(body.schedule.startHour).toBe(22)
+  expect(body.schedule.endMinute).toBe(45)
+  expect(body.nextRunAt).toBeNull() // 测试不起调度循环，wakeScheduler 空转
+  // 确实落库：再读一次是新值
+  const after = await app.request("/api/settings", { headers: { cookie } })
+  expect(((await after.json()) as RuntimeSettings).schedule.startHour).toBe(22)
 })

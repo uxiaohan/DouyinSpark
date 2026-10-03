@@ -2,7 +2,6 @@ import { loadSettings } from "./config"
 import { log } from "./logger"
 import { runOnce } from "./runner"
 import type { RuntimeSettings } from "./types"
-import { sleep } from "./util"
 
 /**
  * 在 [schedule.start, schedule.end] 内取随机点；当前晚于 end 则顺延次日。
@@ -53,6 +52,51 @@ export function planNextRun(settings: RuntimeSettings, now = new Date(), after?:
   return nextRunAt
 }
 
+/** 睡眠中挂在这里的提前结束钩子；wakeScheduler() 调它打断睡眠 */
+let wakeSleep: (() => void) | null = null
+
+/** 唤醒方等待的应答：循环重排并登记完成后触发 */
+let ackWake: (() => void) | null = null
+
+/**
+ * 可中断睡眠：ms 到点 resolve(false)，被 wakeScheduler() 提前结束 resolve(true)。
+ * 保存设置后必须唤醒循环——它原本睡在旧 settings 算出的时长上，
+ * 新区间要等这一觉睡完再跑一批才生效。
+ */
+export function interruptibleSleep(ms: number): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const onTimeout = () => {
+      wakeSleep = null
+      resolve(false)
+    }
+    const onWake = () => {
+      clearTimeout(timer)
+      wakeSleep = null
+      resolve(true)
+    }
+    const timer = setTimeout(onTimeout, ms)
+    wakeSleep = onWake
+  })
+}
+
+/**
+ * 保存设置后由 web 层调用：打断循环当前的睡眠，并等它按最新 settings
+ * 重排完再返回。ack 保证调用方随后读到的 getNextRunAt() 就是新区间
+ * 取的点；没在睡（--web-only 或正在跑批）时直接 resolve(false)，无副作用。
+ */
+export function wakeScheduler(): Promise<boolean> {
+  if (!wakeSleep) return Promise.resolve(false)
+  const done = wakeSleep
+  wakeSleep = null
+  return new Promise<boolean>((resolve) => {
+    ackWake = () => {
+      ackWake = null
+      resolve(true)
+    }
+    done()
+  })
+}
+
 /** 包含 from 的那个调度窗口的结束时刻；跨零点时落到次日 */
 export function windowEnd(settings: RuntimeSettings, from = new Date()): Date {
   const { startHour, startMinute, endHour, endMinute } = settings.schedule
@@ -67,7 +111,8 @@ export function windowEnd(settings: RuntimeSettings, from = new Date()): Date {
 /** 调度循环依赖：生产环境用默认实现，测试注入假时钟/假跑批驱动它 */
 export interface SchedulerDeps {
   now: () => number
-  sleep: (ms: number) => Promise<void>
+  /** 睡到返回 false；被 wakeScheduler 提前结束返回 true（调用方据此重排而非跑批） */
+  sleep: (ms: number) => Promise<unknown>
   /** 跑一批；返回值 discarded，跑批结果由 runner 自己落库 */
   run: () => Promise<unknown>
   loadSettings: () => RuntimeSettings
@@ -75,7 +120,7 @@ export interface SchedulerDeps {
 
 const prodDeps: SchedulerDeps = {
   now: () => Date.now(),
-  sleep,
+  sleep: interruptibleSleep,
   run: () => runOnce("schedule"),
   loadSettings,
 }
@@ -92,9 +137,13 @@ export async function schedulerLoop(deps: SchedulerDeps): Promise<never> {
   for (;;) {
     const settings = deps.loadSettings()
     const next = planNextRun(settings, new Date(deps.now()), after)
+    // 唤醒方（PUT /api/settings）等的就是这次重排登记完成
+    ackWake?.()
     after = undefined
     log.info("scheduler: 下次运行", { at: next.toISOString() })
-    await deps.sleep(Math.max(0, next.getTime() - deps.now()))
+    // 被 wakeScheduler 提前结束 = 设置刚保存过：回到顶部按最新 settings 重排，
+    // 不当成到点。ack 待顶部那次 planNextRun 登记后才触发，PUT 读到的即最终值。
+    if (await deps.sleep(Math.max(0, next.getTime() - deps.now()))) continue
     try {
       await deps.run()
     } catch (err) {

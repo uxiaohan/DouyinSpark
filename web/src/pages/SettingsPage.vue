@@ -101,13 +101,21 @@ async function load() {
 async function save() {
   saving.value = true
   try {
-    await api.putSettings(toSettings())
-    toast('设置已保存', 'success')
+    // 保存即重排：后端已按新区间重新取点，直接把新时间提示给用户
+    const { nextRunAt } = await api.putSettings(toSettings())
+    const when = nextRunAt ? `，下次运行 ${formatClock(nextRunAt)}` : ''
+    toast(`设置已保存${when}`, 'success')
   } catch (err) {
     toast(err instanceof Error ? err.message : '保存失败', 'error')
   } finally {
     saving.value = false
   }
+}
+
+function formatClock(iso: string) {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 async function testNotify() {
