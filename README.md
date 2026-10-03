@@ -129,6 +129,21 @@ GHCR 的 package 默认**私有**，拉不动就先登录（用有 `read:package
 docker login ghcr.io
 ```
 
+#### 国内加速（ghcr.nju.edu.cn）
+
+ghcr.io 国内直连不稳，可用南京大学的 GHCR 代理 `ghcr.nju.edu.cn`——镜像路径与 ghcr.io 相同，只换主机名：
+
+```bash
+# 直接拉
+docker pull ghcr.nju.edu.cn/uxiaohan/douyinspark:latest
+
+# 或让 compose 整体走代理（镜像名可覆盖）
+DOUYIN_IMAGE=ghcr.nju.edu.cn/uxiaohan/douyinspark docker compose up -d
+```
+
+注意：代理只同步**公开**的 package。私有包要么先去 package 页面 Settings 改成 public，
+否则仍然走 `docker login ghcr.io` + 有 `read:packages` 的 PAT 从官方源拉。
+
 ### 本地构建运行
 
 ```bash

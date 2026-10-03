@@ -1,6 +1,6 @@
 services:
   douyinspark:
-    image: ghcr.io/uxiaohan/douyinspark:${DOUYIN_TAG:-latest}
+    image: ${DOUYIN_IMAGE:-ghcr.io/uxiaohan/douyinspark}:${DOUYIN_TAG:-latest}
     container_name: douyinspark
     restart: unless-stopped
     # Chromium 默认只用 64MB /dev/shm，页面一复杂就崩；放大到 1GB
