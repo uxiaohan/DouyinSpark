@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ArrowRight, CalendarClock, Zap } from 'lucide-vue-next'
+import { ArrowRight, CalendarClock } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import NumberTicker from '@/components/effects/NumberTicker.vue'
@@ -75,15 +75,6 @@ async function load() {
   }
 }
 
-async function testNotify() {
-  try {
-    await api.testNotify()
-    toast('测试通知已发送', 'success')
-  } catch (err) {
-    toast(err instanceof Error ? err.message : '通知测试失败', 'error')
-  }
-}
-
 // layout 通过 @toast 注入 showToast，包一层统一调用
 function toast(message: string, tone?: 'success' | 'info' | 'warning' | 'error') {
   emit('toast', message, tone)
@@ -136,9 +127,6 @@ onMounted(async () => {
             <span>下次运行</span>
             <strong>{{ nextRunAt ? formatTime(nextRunAt) : '未调度' }}</strong>
           </div>
-        </div>
-        <div class="console-actions">
-          <Button variant="ghost" @click="testNotify"><Zap />测试通知</Button>
         </div>
         <div class="channel-strip">
           <div>

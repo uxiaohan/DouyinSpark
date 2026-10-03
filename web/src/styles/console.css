@@ -3,9 +3,6 @@
 /* 登录页：口令输入框与登录按钮之间留出间距 */
 .login-form .login-submit-effect { margin-top: 14px; }
 
-/* 仪表盘操作区 */
-.console-actions { display: flex; padding: 14px 0 4px; align-items: center; gap: 8px; }
-
 /* 好友/文案页的账号范围切换 */
 .console-tabs { display: flex; padding: 14px 16px 2px; align-items: center; gap: 10px; }
 
@@ -40,6 +37,5 @@
 .console-time-scroll::-webkit-scrollbar-track { background: transparent; }
 
 @media (max-width: 640px) {
-  .console-actions { flex-wrap: wrap; }
   .console-tabs { overflow-x: auto; }
 }
