@@ -19,8 +19,6 @@ import {
   updateAccount,
 } from "../repo"
 import { getNextRunAt, wakeScheduler } from "../scheduler"
-import { isRunning, requestStop, runOnce } from "../runner"
-import { log } from "../logger"
 import { sendPushDeer } from "../notify"
 import { issueSession, readPasswordHash, verifyPassword, writePasswordHash } from "./auth"
 import type { AccountRow, Bool, RunItemRow, RuntimeSettings } from "../types"
@@ -62,9 +60,6 @@ export function createApp(): Hono {
     if (path === "/api/login" || path === "/api/logout" || path === "/api/bootstrap") {
       await next()
       return
-    }
-    if (path === "/api/runs/now" && !(await hasSession(c))) {
-      return c.body(null, 401)
     }
     if (!(await hasSession(c))) return c.body(null, 401)
     await next()
@@ -240,17 +235,6 @@ export function createApp(): Hono {
   app.get("/api/runs", (c) => c.json({ items: listRuns(50) }))
 
   app.get("/api/runs/:id/items", (c) => c.json({ items: listRunItems(Number(c.req.param("id"))) }))
-
-  app.post("/api/runs/now", (c) => {
-    if (isRunning()) return c.json({ error: "已有运行在进行中" }, 409)
-    void runOnce("manual").catch((err: unknown) => log.error("手动运行失败", { err: String(err) }))
-    return c.json({ ok: true })
-  })
-
-  app.post("/api/stop", (c) => {
-    requestStop()
-    return c.json({ ok: true })
-  })
 
   // 只回调度登记过的那个时间。原来是这里现算，窗口内是 Math.random() 取点，
   // 每次请求都是新随机数——刷新一次页面数字就变，而且和调度真正采用的时间对不上。

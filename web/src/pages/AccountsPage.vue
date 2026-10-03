@@ -201,7 +201,7 @@ onMounted(load)
 
     <div class="table-footer">
       <span>共 {{ filtered.length }} 个账号</span>
-      <div><span>别名或 Cookie 变更后建议立即执行一次验证</span></div>
+      <div><span>别名或 Cookie 变更后建议在下次调度窗口关注运行日志</span></div>
     </div>
   </section>
 

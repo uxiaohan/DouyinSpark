@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ArrowRight, CalendarClock, Play, Square, Zap } from 'lucide-vue-next'
+import { ArrowRight, CalendarClock, Zap } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import NumberTicker from '@/components/effects/NumberTicker.vue'
@@ -17,7 +17,6 @@ const friends = ref<Friend[]>([])
 const runs = ref<Run[]>([])
 const settings = ref<Settings | null>(null)
 const nextRunAt = ref<string | null>(null)
-const running = ref(false)
 
 const enabledAccounts = computed(() => accounts.value.filter((a) => a.enabled).length)
 const messageCount = ref(0)
@@ -73,25 +72,6 @@ async function load() {
     friends.value = friendLists.flatMap((r) => r.items)
   } catch (err) {
     toast(err instanceof Error ? err.message : '数据加载失败', 'error')
-  }
-}
-
-async function runNow() {
-  try {
-    await api.runNow()
-    toast('已触发一次运行', 'success')
-    await load()
-  } catch (err) {
-    toast(err instanceof Error ? err.message : '触发失败', 'error')
-  }
-}
-
-async function stop() {
-  try {
-    await api.stop()
-    toast('已请求停止当前运行', 'warning')
-  } catch (err) {
-    toast(err instanceof Error ? err.message : '停止失败', 'error')
   }
 }
 
@@ -158,8 +138,6 @@ onMounted(async () => {
           </div>
         </div>
         <div class="console-actions">
-          <Button class="primary-action" @click="runNow"><Play />立即执行</Button>
-          <Button variant="outline" @click="stop"><Square />停止</Button>
           <Button variant="ghost" @click="testNotify"><Zap />测试通知</Button>
         </div>
         <div class="channel-strip">
@@ -213,7 +191,7 @@ onMounted(async () => {
         </div>
         <div v-if="runs.length === 0" class="empty-state">
           <strong>还没有运行记录</strong>
-          <span>点击「立即执行」触发第一次运行</span>
+          <span>到达每日调度窗口后自动运行</span>
         </div>
       </div>
     </section>

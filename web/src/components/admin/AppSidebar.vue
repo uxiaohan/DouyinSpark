@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { motion } from 'motion-v'
-import { ChevronDown, Command as CommandIcon, LogOut, Settings2, Zap } from 'lucide-vue-next'
+import { ChevronDown, Command as CommandIcon, LogOut, Settings2 } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,15 +20,6 @@ const MotionDiv = motion.div
 const route = useRoute()
 const router = useRouter()
 const { showToast } = useToasts()
-
-async function runNow() {
-  try {
-    await api.runNow()
-    showToast('已触发一次运行', 'success')
-  } catch (err) {
-    showToast(err instanceof Error ? err.message : '触发失败', 'error')
-  }
-}
 
 async function testNotify() {
   try {
@@ -70,7 +61,6 @@ async function testNotify() {
       </Tooltip>
       <div class="nav-divider" />
       <span class="nav-caption" :aria-hidden="collapsed">快捷操作</span>
-      <button class="nav-button muted" @click="runNow"><Zap :size="16" /><span class="nav-label" :aria-hidden="collapsed">立即执行</span></button>
       <button class="nav-button muted" @click="testNotify"><Settings2 :size="16" /><span class="nav-label" :aria-hidden="collapsed">测试通知</span></button>
     </nav>
     <div class="sidebar-live" :class="{ compact: collapsed }">

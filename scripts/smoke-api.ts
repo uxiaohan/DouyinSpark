@@ -1,4 +1,4 @@
-// 直接以 app.fetch 打一遍 /api 路由，覆盖单元测试之外的 friends/messages/runs/stop 与 dryRun 分支。
+// 直接以 app.fetch 打一遍 /api 路由，覆盖单元测试之外的 friends/messages/runs 与 dryRun 分支。
 // 用法：
 //   bun run scripts/clean-db.ts data/smoke-api.db
 //   $env:DB_PATH = 'data/smoke-api.db'; bun run scripts/smoke-api.ts
@@ -93,11 +93,6 @@ check("messages POST", addMsg.status, 200);
 const runs = await call("/api/runs", { headers: auth });
 check("runs", runs.status, 200);
 console.log("     runs:", JSON.stringify(runs.body));
-
-// /api/runs/now 会真的拉起浏览器运行，这里不触发挥器验证成本；并发互斥由 runner.test.ts 覆盖。
-const stopNoRun = await call("/api/stop", { method: "POST", headers: auth });
-check("stop", stopNoRun.status, 200);
-console.log("     stop(无运行中任务):", stopNoRun.status, JSON.stringify(stopNoRun.body));
 
 const notifyTest = await call("/api/notify/test", { method: "POST", headers: auth });
 console.log("     notify/test:", notifyTest.status, JSON.stringify(notifyTest.body));

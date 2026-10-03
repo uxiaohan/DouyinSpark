@@ -100,8 +100,6 @@ export const api = {
 
   listRuns: () => req<{ items: Run[] }>('/runs'),
   listRunItems: (id: number) => req<{ items: RunItem[] }>(`/runs/${id}/items`),
-  runNow: () => req<{ ok: true }>('/runs/now', { method: 'POST' }),
-  stop: () => req<{ ok: true }>('/stop', { method: 'POST' }),
   nextRun: () => req<{ nextRunAt: string | null }>('/next-run'),
   testNotify: () => req<{ ok: boolean }>('/notify/test', { method: 'POST' }),
 }
