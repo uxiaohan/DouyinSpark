@@ -41,16 +41,6 @@ async function firstVisible(page: Page, selectors: readonly string[], timeout = 
   return null
 }
 
-/** 文案是否可见：getByText 的字符串是字面匹配，多个文案必须传 RegExp */
-async function textVisible(page: Page, re: RegExp, timeout = 2000): Promise<boolean> {
-  try {
-    await page.getByText(re).first().waitFor({ state: "visible", timeout })
-    return true
-  } catch {
-    return false
-  }
-}
-
 /**
  * 登录按钮/链接是否可见。
  * 用 role 而不是全文本文案：已登录首页上「登录」文案仍有 1 处命中（隐藏节点），

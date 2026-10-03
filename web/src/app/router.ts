@@ -1,5 +1,5 @@
 import type { RouterHistory } from 'vue-router'
-import { createMemoryHistory, createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
+import { createMemoryHistory, createRouter, createWebHashHistory } from 'vue-router'
 import { isAuthenticated, probeSession } from '@/lib/session'
 import { routes } from './routes'
 

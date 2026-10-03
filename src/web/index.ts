@@ -21,7 +21,7 @@ import {
 import { getNextRunAt, wakeScheduler } from "../scheduler"
 import { sendPushDeer } from "../notify"
 import { issueSession, readPasswordHash, verifyPassword, writePasswordHash } from "./auth"
-import type { AccountRow, Bool, RunItemRow, RuntimeSettings } from "../types"
+import type { AccountRow, Bool, RuntimeSettings } from "../types"
 
 const COOKIE = "session"
 

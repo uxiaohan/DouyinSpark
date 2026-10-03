@@ -1,4 +1,3 @@
-import { Hono } from "hono"
 import { serveStatic } from "@hono/bun"
 import { existsSync } from "node:fs"
 import { log } from "./src/logger"

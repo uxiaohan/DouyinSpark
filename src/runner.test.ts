@@ -3,7 +3,7 @@ import { test, expect, beforeEach } from "bun:test"
 import { DEFAULT_SETTINGS } from "./config"
 import type { AccountResult, AccountRuntime, FriendRow, RuntimeSettings } from "./types"
 import type { RunState } from "./runner"
-import { cookieExpiredResult, handleFriend, isRunning, persistAccountItems, pickFriendTexts, requestStop, resetStop, summarize } from "./runner"
+import { cookieExpiredResult, handleFriend, isRunning, persistAccountItems, pickFriendTexts, resetStop, summarize } from "./runner"
 import { createRun, listRunItems } from "./repo"
 
 const friend = (id: number, name: string): FriendRow => ({ id, account_id: 1, name, created_at: "" })

@@ -152,7 +152,7 @@ onMounted(async () => {
           <div><h2>最近运行</h2><p aria-live="polite"><i class="stream-state-dot" />{{ lastRun ? `上次：${formatTime(lastRun.started_at)}` : '暂无运行记录' }}</p></div>
         </div>
         <div class="stream-list">
-          <div v-for="(run, index) in runs.slice(0, 6)" :key="run.id" class="stream-event">
+          <div v-for="run in runs.slice(0, 6)" :key="run.id" class="stream-event">
             <time>{{ formatTime(run.started_at) }}</time>
             <i :class="run.status === 'success' ? 'strong' : run.status === 'failed' ? 'warning' : ''" />
             <div>

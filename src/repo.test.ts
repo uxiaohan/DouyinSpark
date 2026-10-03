@@ -70,7 +70,7 @@ test("finishRun 落库状态与汇总", () => {
 // 回归：进程被硬杀/崩溃时 finishRun 来不及跑，runs 里留下永远"进行中"的行，
 // 界面里阴魂不散（2026-10-04 仪表盘"最近运行"显示的僵尸 run 31）。启动时收尾。
 test("reapStaleRuns 把残留的 running 行收尾为 aborted 并写结束时间", () => {
-  const runId = createRun("schedule")
+  createRun("schedule")
   expect(listRuns(1)[0]!.status).toBe("running")
   expect(reapStaleRuns()).toBe(1)
   const row = listRuns(1)[0]!
