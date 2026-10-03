@@ -130,14 +130,17 @@ export function saveSettings(s: RuntimeSettings): void {
 
 export function loadRunConfig(): RunConfig {
   const settings = loadSettings()
-  const accounts: AccountRuntime[] = listAccounts(true).map((account) => ({
-    account,
-    friends: listFriends(account.id),
-    // 账号专属文案在前，全局文案池兜底
-    messages: [...listMessages(account.id), ...listMessages(null)]
-      .map((m) => m.text)
-      .filter((t) => t.trim().length > 0),
-  }))
+  const accounts: AccountRuntime[] = listAccounts(true).map((account) => {
+    const clean = (rows: ReturnType<typeof listMessages>) => rows.map((m) => m.text).filter((t) => t.trim().length > 0)
+    return {
+      account,
+      friends: listFriends(account.id),
+      // 专属与全局分开存：挑选时专属优先、全局兜底（见 pickFriendTexts），
+      // 以前合成一个池随机抽，专属会被全局淹没
+      messages: clean(listMessages(account.id)),
+      fallbackMessages: clean(listMessages(null)),
+    }
+  })
   return { settings, accounts }
 }
 

@@ -118,10 +118,37 @@ export function summarize(
   return { runId, trigger, startedAt, finishedAt: nowISO(), status, totals, accounts }
 }
 
+/**
+ * 给一个好友挑本轮要发的文案：账号专属优先，专属不够才用全局兜底。
+ *
+ * 以前两类文案在 loadRunConfig 里合成一个池、sampleN 全场随机抽——专属只有
+ * 一两条时会被全局淹没（用户实测：8 条池子里 1 条专属，抽中概率 1/8，
+ * 真发了一批全是公共文案），"专属在前、全局兜底"的注释形同虚设。
+ * 跨池去重无条件做：同一条文案发给同一个好友两遍，不管是哪个设置都不像话。
+ */
+export function pickFriendTexts(
+  messages: readonly string[],
+  fallback: readonly string[],
+  count: number,
+  dedupe: boolean,
+): string[] {
+  const n = Math.max(0, count)
+  const own = sampleN(messages, n, dedupe)
+  if (own.length >= n) return own
+  const used = new Set(own)
+  const rest = sampleN(
+    fallback.filter((t) => !used.has(t)),
+    n - own.length,
+    dedupe,
+  )
+  return [...own, ...rest]
+}
+
 async function driveFriend(
   page: Page,
   friend: FriendRow,
   pool: string[],
+  fallback: string[],
   s: RuntimeSettings,
   capLeft: () => number,
 ): Promise<FriendOutcome> {
@@ -130,13 +157,15 @@ async function driveFriend(
 
   const blocked = await detectBlocked(page)
   if (blocked) return { status: "failed", messages: 0, reason: `风控: ${blocked}` }
-  if (s.dryRun) return { status: "skipped", messages: 0, reason: "dry-run 未发送" }
 
   const left = capLeft()
-  if (left <= 0) return { status: "skipped", messages: 0, reason: "已达当日上限" }
-
   const want = randInt(s.perFriendMessages[0], Math.max(s.perFriendMessages[0], s.perFriendMessages[1]))
-  const texts = sampleN(pool, Math.min(want, left), s.dedupeMessagesPerFriend)
+  const texts = pickFriendTexts(pool, fallback, Math.min(want, Math.max(left, 0)), s.dedupeMessagesPerFriend)
+  // 挑选提前到 dry-run 判断之前 + 打日志： dry-run 也能核对"将会发什么"，
+  // 专属/全局的挑选优先级出问题不用真发就能发现（结果判定顺序不变）
+  log.info("挑选本轮文案", { friend: friend.name, own: pool.length, fallback: fallback.length, texts })
+  if (s.dryRun) return { status: "skipped", messages: 0, reason: "dry-run 未发送" }
+  if (left <= 0) return { status: "skipped", messages: 0, reason: "已达当日上限" }
   if (texts.length === 0) return { status: "skipped", messages: 0, reason: "无可用文案" }
 
   let sent = 0
@@ -152,7 +181,7 @@ async function driveFriend(
 }
 
 async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountResult> {
-  const { account, friends, messages } = rt
+  const { account, friends, messages, fallbackMessages } = rt
   const s = state.settings
   const base: AccountResult = {
     accountId: account.id,
@@ -200,7 +229,7 @@ async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountR
         addRunItem({ run_id: state.runId, account_id: account.id, friend_id: friend.id, friend_name: friend.name, status: "skipped", messages: 0, reason: "跑批已停止" })
         continue
       }
-      const fr = await handleFriend(friend, state, (f) => driveFriend(page, f, messages, s, capLeft))
+      const fr = await handleFriend(friend, state, (f) => driveFriend(page, f, messages, fallbackMessages, s, capLeft))
       result.friends.push(fr)
       addRunItem({ run_id: state.runId, account_id: account.id, friend_id: friend.id, friend_name: friend.name, status: fr.status, messages: fr.messages, reason: fr.reason })
       if (fr.messages > 0) {

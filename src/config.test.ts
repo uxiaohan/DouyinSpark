@@ -38,7 +38,7 @@ test("parseCookies 非法 JSON 与 null 返回空数组", () => {
   expect(parseCookies("[]")).toEqual([])
 })
 
-test("loadRunConfig 只聚合启用账号并挂上全局文案池", () => {
+test("loadRunConfig 只聚合启用账号，专属文案与全局文案分池", () => {
   const on = createAccount({ alias: "on" })
   const off = createAccount({ alias: "off", enabled: 0 })
   createFriend(on, "好友A")
@@ -50,8 +50,9 @@ test("loadRunConfig 只聚合启用账号并挂上全局文案池", () => {
   expect(cfg.accounts.length).toBe(1)
   expect(cfg.accounts[0]!.account.alias).toBe("on")
   expect(cfg.accounts[0]!.friends.map((f) => f.name)).toEqual(["好友A"])
-  expect(cfg.accounts[0]!.messages).toContain("全局文案")
-  expect(cfg.accounts[0]!.messages).toContain("账号专属")
+  // 分池是"专属优先、全局兜底"的前提：合成一个池就会被全局淹没（用户实测踩过）
+  expect(cfg.accounts[0]!.messages).toEqual(["账号专属"])
+  expect(cfg.accounts[0]!.fallbackMessages).toEqual(["全局文案"])
 })
 
 test("loadSettings 对损坏数据回落默认", () => {

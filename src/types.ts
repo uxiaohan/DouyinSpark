@@ -84,8 +84,10 @@ export type RuntimeSettings = {
 export type AccountRuntime = {
   account: AccountRow
   friends: FriendRow[]
-  /** 账号专属文案 + 全局文案池 */
+  /** 账号专属文案：够用时只会用这些 */
   messages: string[]
+  /** 全局文案：账号专属不够时兜底 */
+  fallbackMessages: string[]
 }
 
 export type RunConfig = {
