@@ -1,5 +1,5 @@
 import { Hono } from "hono"
-import { serveStatic } from "hono/bun"
+import { serveStatic } from "@hono/bun"
 import { existsSync } from "node:fs"
 import { log } from "./src/logger"
 import { createApp } from "./src/web"
