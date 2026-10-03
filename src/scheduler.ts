@@ -17,8 +17,9 @@ export function computeNextRunAt(settings: RuntimeSettings, now = new Date(), af
   start.setHours(startHour, startMinute, 0, 0)
   const end = new Date(from)
   end.setHours(endHour, endMinute, 0, 0)
-  // 结束早于开始 = 跨零点窗口，end 落到次日。
-  // 相等不算跨零点：零长窗口（start == end）语义是"每天到点就跑"，
+  // 合法配置的开始/结束永远是同一天的两个时刻（否则控制台和后端都拒绝保存），
+  // 这里只在有人手改数据库时兜底：结束早于开始就把 end 落到次日，别算出过去的时间。
+  // 相等不算——零长窗口（start == end）语义是"每天到点就跑"，
   // 曾被 <= 当成跨零点把 end 推到次日，窗口悄悄变成 24 小时、随机取点。
   if (end.getTime() < start.getTime()) end.setDate(end.getDate() + 1)
 
@@ -101,7 +102,7 @@ export function wakeScheduler(): Promise<boolean> {
   })
 }
 
-/** 包含 from 的那个调度窗口的结束时刻；跨零点时落到次日（零长窗口就是开始时刻本身） */
+/** 包含 from 的那个调度窗口的结束时刻；同一天内不滚动（手改库的非法区间才落到次日兜底） */
 export function windowEnd(settings: RuntimeSettings, from = new Date()): Date {
   const { startHour, startMinute, endHour, endMinute } = settings.schedule
   const start = new Date(from)
