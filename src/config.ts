@@ -23,7 +23,6 @@ export const DEFAULT_SETTINGS: RuntimeSettings = {
   gapBetweenAccountsMs: [30000, 90000],
   typingCps: [8, 16],
   maxScrollAttempts: 10,
-  dryRun: true,
   pushdeerKey: null,
   notifyOnRun: true,
   notifyOnAbort: true,
@@ -114,7 +113,6 @@ export function loadSettings(): RuntimeSettings {
     gapBetweenAccountsMs: readPair("gapBetweenAccountsMs", d.gapBetweenAccountsMs),
     typingCps: readPair("typingCps", d.typingCps),
     maxScrollAttempts: readNumber("maxScrollAttempts", d.maxScrollAttempts),
-    dryRun: readBool("dryRun", d.dryRun),
     pushdeerKey: readNullableString("pushdeerKey"),
     notifyOnRun: readBool("notifyOnRun", d.notifyOnRun),
     notifyOnAbort: readBool("notifyOnAbort", d.notifyOnAbort),
@@ -137,7 +135,6 @@ export function saveSettings(s: RuntimeSettings): void {
   setSetting("gapBetweenAccountsMs", s.gapBetweenAccountsMs)
   setSetting("typingCps", s.typingCps)
   setSetting("maxScrollAttempts", s.maxScrollAttempts)
-  setSetting("dryRun", s.dryRun)
   setSetting("pushdeerKey", s.pushdeerKey)
   setSetting("notifyOnRun", s.notifyOnRun)
   setSetting("notifyOnAbort", s.notifyOnAbort)

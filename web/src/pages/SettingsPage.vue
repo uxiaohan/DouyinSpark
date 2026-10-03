@@ -31,7 +31,6 @@ const form = reactive({
   maxScrollAttempts: 3,
   shuffleFriends: true,
   dedupeMessagesPerFriend: true,
-  dryRun: false,
   dailyCapPerAccount: 100,
   retryPerFriend: 1,
   consecutiveFailAbort: 3,
@@ -62,7 +61,6 @@ function toSettings(): Settings {
     gapBetweenAccountsMs: [form.accountGapMin, form.accountGapMax],
     typingCps: [form.typingCpsMin, form.typingCpsMax],
     maxScrollAttempts: form.maxScrollAttempts,
-    dryRun: form.dryRun,
     pushdeerKey: form.pushdeerKey.trim() === '' ? null : form.pushdeerKey.trim(),
     notifyOnRun: form.notifyOnRun,
     notifyOnAbort: form.notifyOnAbort,
@@ -87,7 +85,6 @@ function fromSettings(s: Settings) {
   form.maxScrollAttempts = s.maxScrollAttempts
   form.shuffleFriends = s.shuffleFriends
   form.dedupeMessagesPerFriend = s.dedupeMessagesPerFriend
-  form.dryRun = s.dryRun
   form.dailyCapPerAccount = s.limits.dailyCapPerAccount
   form.retryPerFriend = s.limits.retryPerFriend
   form.consecutiveFailAbort = s.limits.consecutiveFailAbort
@@ -220,10 +217,6 @@ onMounted(load)
         <div class="component-control-row">
           <span>同一好友内不重复文案（dedupeMessagesPerFriend）</span>
           <label class="console-switch"><input v-model="form.dedupeMessagesPerFriend" type="checkbox" /><i /></label>
-        </div>
-        <div class="component-control-row">
-          <span>dry-run（只演练不真发）</span>
-          <label class="console-switch"><input v-model="form.dryRun" type="checkbox" /><i /></label>
         </div>
         <div class="component-form-grid">
           <label class="component-field">单账号每日上限

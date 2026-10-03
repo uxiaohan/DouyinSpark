@@ -151,7 +151,7 @@ test("跨零点窗口跑完后也排到次日窗口", () => {
 // 回归：startScheduler 原来只在跑完后"登记"顺延时间，循环顶上又用 now 重取一个点，
 // 把登记覆盖掉，于是同一窗口内连跑多轮。实测 2026-10-03：20:00-20:03 窗口
 // run 13(20:02:39)→run 14(20:02:59)；20:06-20:10 窗口 run 15(20:09:01)→run 16(20:09:59)。
-// dry-run 下只是白跑一遍，dryRun=false 就是一天给好友发两条。computeNextRunAt 的
+// 连跑多轮同窗口就是一天给好友发两条。computeNextRunAt 的
 // after 参数早就有对应用例，缺的是把循环本身的接线钉住。
 test("循环跑完一批后不会把下一轮排进同一个窗口", async () => {
   const S2: RuntimeSettings = { ...S, schedule: { startHour: 20, startMinute: 0, endHour: 20, endMinute: 3 } }

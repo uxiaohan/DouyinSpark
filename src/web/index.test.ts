@@ -157,8 +157,7 @@ async function sessionCookie(): Promise<string> {
 // 回归：/api/next-run 原先每次请求都重新随机取点，刷新页面就变，
 // 而且和调度真正采用的时间不是同一个值。现在只回登记过的那个。
 // 回归：好友原来可以重复添加，同一备注出现两行——运行会命中同一个会话，
-// dry-run 下只是多发一遍通知，dryRun=false 就是给同一个人发两条。
-// 现在同账号下折叠空白后重名直接 409，不落库。
+// 给同一个人发两条。现在同账号下折叠空白后重名直接 409，不落库。
 test("POST /api/accounts/:id/friends 同账号重名返回 409 且不落库", async () => {
   const cookie = await sessionCookie()
   const created = await app.request("/api/accounts", {

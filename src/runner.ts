@@ -195,10 +195,7 @@ async function driveFriend(
   const texts = pickFriendTexts(pool, fallback, Math.min(want, Math.max(left, 0)), s.dedupeMessagesPerFriend, used)
   // 挑完就登记：同账户下一个好友不再挑到同一条（多好友不发重复文案）
   for (const t of texts) used.add(t)
-  // 挑选提前到 dry-run 判断之前 + 打日志： dry-run 也能核对"将会发什么"，
-  // 专属/全局的挑选优先级出问题不用真发就能发现（结果判定顺序不变）
   log.info("挑选本轮文案", { friend: friend.name, own: pool.length, fallback: fallback.length, texts })
-  if (s.dryRun) return { status: "skipped", messages: 0, reason: "dry-run 未发送" }
   if (left <= 0) return { status: "skipped", messages: 0, reason: "已达当日上限" }
   // 只有"这个账号一条文案都没有"才会走到这里：专属空→走全局，全局也空
   if (texts.length === 0) return { status: "skipped", messages: 0, reason: "无可用文案" }

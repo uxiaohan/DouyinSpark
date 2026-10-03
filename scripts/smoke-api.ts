@@ -1,4 +1,4 @@
-// 直接以 app.fetch 打一遍 /api 路由，覆盖单元测试之外的 friends/messages/runs 与 dryRun 分支。
+// 直接以 app.fetch 打一遍 /api 路由，覆盖单元测试之外的 friends/messages/runs 分支。
 // 用法：
 //   bun run scripts/clean-db.ts data/smoke-api.db
 //   $env:DB_PATH = 'data/smoke-api.db'; bun run scripts/smoke-api.ts

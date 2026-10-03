@@ -115,7 +115,6 @@ onMounted(async () => {
         <div class="signal-head">
           <div class="signal-title">
             <h2>运行操作</h2>
-            <span>{{ settings?.dryRun ? 'dry-run 模式' : '真发模式' }}</span>
           </div>
         </div>
         <div class="signal-summary">

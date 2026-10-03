@@ -21,7 +21,6 @@
 .stream-head h2,
 .queue-head h2,
 .activity-head h2 { margin: 0; font-size: 14px; font-weight: 630; line-height: 20px; }
-.signal-title > span:last-child { padding: 1px 6px; color: var(--signal-deep); border: 1px solid #d8dfff; border-radius: 4px; background: #f2f4ff; font-size: 12px; }
 .signal-head p,
 .stream-head p,
 .queue-head p,

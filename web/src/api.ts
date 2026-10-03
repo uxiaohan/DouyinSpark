@@ -11,7 +11,6 @@ export type Settings = {
   gapBetweenAccountsMs: [number, number]
   typingCps: [number, number]
   maxScrollAttempts: number
-  dryRun: boolean
   pushdeerKey: string | null
   notifyOnRun: boolean
   notifyOnAbort: boolean
