@@ -3,16 +3,34 @@ import { log } from "./logger"
 import { SEL } from "./selectors"
 import { randInt, sleep } from "./util"
 
-/** 会话项首行即备注/昵称，精确匹配 */
-export function matchName(text: string, name: string): boolean {
-  const first = text
-    .split("\n")
-    .map((s) => s.trim())
-    .find((s) => s.length > 0)
-  return first === name.trim()
+/**
+ * 空白归一：JS 的 \s 已含不换行空格 U+00A0、全角空格 U+3000 等，
+ * 统一折叠成单个普通空格。
+ * 为什么必须做：实测抖音在昵称里渲染的是 U+00A0（字符码 160），而控制台里
+ * 粘贴/输入的是普通空格（字符码 32）。不比这一下，每个好友都匹配不上，
+ * 整批只会得到"未找到会话"——工具等于完全不能用。
+ */
+function normSpace(s: string): string {
+  return s.replace(/\s+/g, " ").trim()
 }
 
-export function findConversationIndex(texts: string[], name: string): number {
+/**
+ * 会话项首行即备注/昵称，精确匹配（空白归一后）。
+ * text 允许 undefined：抖音会话列表是虚拟滚动，`allInnerTexts()`（底层 $$eval）
+ * 在列表重渲染时会对已脱离文档的节点返回 undefined。宁可不匹配，不能抛。
+ */
+export function matchName(text: string | undefined, name: string): boolean {
+  if (typeof text !== "string") return false
+  const first = normSpace(
+    text
+      .split("\n")
+      .map((s) => s.trim())
+      .find((s) => s.length > 0) ?? "",
+  )
+  return first === normSpace(name)
+}
+
+export function findConversationIndex(texts: Array<string | undefined>, name: string): number {
   return texts.findIndex((t) => matchName(t, name))
 }
 
@@ -103,6 +121,9 @@ export async function openConversation(page: Page, friendName: string, maxScroll
   let prevSig = ""
   for (let attempt = 0; attempt <= maxScroll; attempt++) {
     const texts = await items.allInnerTexts()
+    // 虚拟列表重渲染会吐出 undefined；出现即说明取文本这步不稳，要留痕不能静默跳过
+    const nonString = texts.filter((t) => typeof t !== "string").length
+    if (nonString > 0) log.warn("会话项文本取到非字符串", { friend: friendName, nonString, total: texts.length })
     const idx = findConversationIndex(texts, friendName)
     if (idx >= 0) {
       try {

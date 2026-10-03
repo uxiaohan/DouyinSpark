@@ -55,3 +55,29 @@ test("findConversationIndex 返回命中下标，未命中为 -1", () => {
   expect(findConversationIndex(texts, "赵六")).toBe(-1)
   expect(findConversationIndex([], "张三")).toBe(-1)
 })
+
+// 回归：真实跑批时 allInnerTexts()（底层 $$eval）在虚拟列表重渲染下返回过 undefined，
+// matchName 直接 .split 抛 TypeError，把好友记成 failed 并累计连续失败。
+test("会话项文本为 undefined 时不抛，按不匹配处理", () => {
+  expect(matchName(undefined, "张三")).toBe(false)
+  expect(findConversationIndex([undefined, "张三\n在吗", undefined], "张三")).toBe(1)
+  expect(findConversationIndex([undefined, undefined], "张三")).toBe(-1)
+})
+
+// 回归：抖音在昵称里渲染的是不换行空格 U+00A0（实测码 160），控制台粘贴进来的是
+// 普通空格 U+0020（实测码 32）。不做空白归一的话 every friend 都匹配不上，
+// 全部记成"未找到会话"——工具等于完全不能用。
+test("不换行空格与普通空格视为同一个名字", () => {
+  expect(matchName("灵匠\u00a0宋泽浩\n15分钟前\n行", "灵匠 宋泽浩")).toBe(true)
+  expect(matchName("灵匠 宋泽浩\n15分钟前", "灵匠\u00a0宋泽浩")).toBe(true)
+  // 全角空格同理
+  expect(matchName("灵匠\u3000宋泽浩", "灵匠 宋泽浩")).toBe(true)
+  // 多个连续空白折叠成一个，仍是同一个名字
+  expect(matchName("灵匠  宋泽浩", "灵匠 宋泽浩")).toBe(true)
+})
+
+test("空白归一不放松精确匹配：空格有无仍是两个名字", () => {
+  expect(matchName("张 三", "张三")).toBe(false)
+  expect(matchName("张三", "张 三")).toBe(false)
+  expect(matchName("灵匠 宋泽", "灵匠 宋泽浩")).toBe(false)
+})
