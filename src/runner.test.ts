@@ -161,7 +161,7 @@ test("isRunning 初始为 false", () => {
 
 // 回归（用户真机 run 22）：专属与全局文案曾合成一个池随机抽，8 条池子里 1 条
 // 专属，真发出去的全是公共文案，"专属在前、全局兜底"形同虚设。
-// pickFriendTexts 用循环断言压住随机性：专属够用时永远只出专属。
+// 用户后续口径收紧：账号有专属就不碰全局。以下用循环断言压住随机性。
 test("专属够用：只发账号专属文案", () => {
   for (let i = 0; i < 50; i++) {
     const texts = pickFriendTexts(["专属甲", "专属乙"], ["全局一", "全局二"], 2, true)
@@ -169,17 +169,15 @@ test("专属够用：只发账号专属文案", () => {
   }
 })
 
-test("专属不够：专属全出，剩下用全局兜底补足", () => {
+test("专属不够：只发专属，不用全局垫数", () => {
   for (let i = 0; i < 50; i++) {
+    // count 远大于专属数，也绝不多发一条全局——宁可少发
     const texts = pickFriendTexts(["专属甲"], ["全局一", "全局二"], 3, true)
-    expect(texts.length).toBe(3)
-    expect(texts).toContain("专属甲")
-    // 剩下两条只能来自全局，且不重复
-    expect(texts.filter((t) => t !== "专属甲").sort()).toEqual(["全局一", "全局二"])
+    expect(texts).toEqual(["专属甲"])
   }
 })
 
-test("没有专属文案：全部用全局兜底", () => {
+test("没有专属文案：才用全局", () => {
   const texts = pickFriendTexts([], ["全局一", "全局二"], 2, true)
   expect(texts.sort()).toEqual(["全局一", "全局二"])
 })
@@ -188,12 +186,10 @@ test("两个池都空：返回空（调用方据此跳过该好友）", () => {
   expect(pickFriendTexts([], [], 2, true)).toEqual([])
 })
 
-test("跨池去重：同一条文案不会发给同一个好友两遍", () => {
-  for (let i = 0; i < 50; i++) {
-    const texts = pickFriendTexts(["同一条"], ["同一条", "别的"], 2, true)
-    expect(texts.filter((t) => t === "同一条").length).toBe(1)
-    expect(texts.length).toBe(2)
-  }
+test("同一个好友内同一条不重样（dedupe 开）", () => {
+  const texts = pickFriendTexts([], ["同一条", "同一条", "别的"], 2, true)
+  expect(texts.filter((t) => t === "同一条").length).toBe(1)
+  expect(texts.length).toBe(2)
 })
 
 test("count 为 0 或负数：不发", () => {
@@ -203,27 +199,26 @@ test("count 为 0 或负数：不发", () => {
 
 // 回归（用户 run 22 真机反馈）：同账户两个好友收到了同一条文案。
 // 专属池只有一条时"专属优先"会让每个好友都挑到它，所以挑选要避开本轮
-// 前面好友已挑走的文案；第二个好友自动落到全局，宁可换文案不重复。
+// 前面好友已挑走的文案。
 test("前面好友挑走的文案不再挑：同账户多好友不同文案", () => {
-  for (let i = 0; i < 50; i++) {
-    const texts = pickFriendTexts(["专属甲"], ["全局一", "全局二"], 1, true, new Set(["专属甲"]))
-    expect(texts.length).toBe(1)
-    expect(["全局一", "全局二"]).toContain(texts[0]!)
-  }
-})
-
-test("整池被用光：允许重复补足，好过没得发", () => {
-  for (let i = 0; i < 50; i++) {
-    // 专属和全局都被前面好友用光：从两池里重复挑一条，长度必须补足
-    const texts = pickFriendTexts(["专属甲"], ["全局一"], 1, true, new Set(["专属甲", "全局一"]))
-    expect(texts.length).toBe(1)
-    expect(["专属甲", "全局一"]).toContain(texts[0]!)
-  }
-})
-
-test("used 只挡已用文案：没用过的照常挑", () => {
   for (let i = 0; i < 50; i++) {
     const texts = pickFriendTexts(["专属甲", "专属乙"], ["全局一"], 1, true, new Set(["专属甲"]))
     expect(texts).toEqual(["专属乙"])
+  }
+})
+
+// 回归（用户 21:38 口径）：有专属就不发全局。专属被前面好友轮空时，
+// 这个好友返回空、由调用方跳过——不落全局，也不对两个人发同一条。
+test("专属被前面好友轮空：返回空让调用方跳过，不落全局", () => {
+  for (let i = 0; i < 50; i++) {
+    const texts = pickFriendTexts(["专属甲"], ["全局一", "全局二"], 1, true, new Set(["专属甲"]))
+    expect(texts).toEqual([])
+  }
+})
+
+test("只有全局池轮空才允许重复补足：没得发比重复更糟", () => {
+  for (let i = 0; i < 50; i++) {
+    const texts = pickFriendTexts([], ["全局一"], 1, true, new Set(["全局一"]))
+    expect(texts).toEqual(["全局一"])
   }
 })

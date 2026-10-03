@@ -119,17 +119,17 @@ export function summarize(
 }
 
 /**
- * 给一个好友挑本轮要发的文案：账号专属优先，专属不够才用全局兜底。
+ * 给一个好友挑本轮要发的文案。
  *
- * 以前两类文案在 loadRunConfig 里合成一个池、sampleN 全场随机抽——专属只有
- * 一两条时会被全局淹没（用户实测：8 条池子里 1 条专属，抽中概率 1/8，
- * 真发了一批全是公共文案），"专属在前、全局兜底"的注释形同虚设。
+ * 池子的归属规则（用户口径）：**账号有专属文案就不碰全局**——专属是这个
+ * 账号的，全局只服务没有专属的账号。所以专属非空时全局直接不参与，
+ * 专属不够就少发几条，绝不拿全局垫数。
  *
  * used 是本轮跑批里**前面好友已经挑走**的文案：同账户多好友不发同一条
- * （用户实测两个好友收到同一文案）。专属池只有一条时，第二个好友会自动
- * 落到全局——宁可换文案，也不对两个人说一样的话。
- * 池子被用光时才允许重复：这个好友没得发比重复更糟。
- * 跨池去重无条件做：同一条文案发给同一个好友两遍，不管是哪个设置都不像话。
+ * （用户实测两个好友收到同一文案）。专属池被前面好友轮空时返回空，
+ * 由调用方跳过这个好友——宁可今晚不发，也不对两个人说同一句话、
+ * 也不把公共文案发给有专属的账号。
+ * 只有全局池才允许重复补足：全局池轮空时没得发比重复更糟。
  */
 export function pickFriendTexts(
   messages: readonly string[],
@@ -139,25 +139,20 @@ export function pickFriendTexts(
   used: ReadonlySet<string> = new Set(),
 ): string[] {
   const n = Math.max(0, count)
-  const own = sampleN(
-    messages.filter((t) => !used.has(t)),
+  const pool = messages.length > 0 ? messages : fallback
+  const picked = sampleN(
+    pool.filter((t) => !used.has(t)),
     n,
     dedupe,
   )
-  const need = n - own.length
-  // 兜底也要避开已挑走的：跨好友的 used + 这个好友已经挑到的 own，
-  // 同一条发给同一个好友两遍，不管是哪个设置都不像话
-  const taken = new Set([...used, ...own])
-  const rest = need > 0 ? sampleN(fallback.filter((t) => !taken.has(t)), need, dedupe) : []
-  const texts = [...own, ...rest]
-  if (texts.length >= n) return texts
-  // 整池被前面好友用光：放开 used 限制补足，重复好过没得发
+  if (picked.length >= n || messages.length > 0) return picked
+  // 走到这里只在用全局池：轮空了允许重复补足
   const more = sampleN(
-    [...messages, ...fallback].filter((t) => !texts.includes(t)),
-    n - texts.length,
+    pool.filter((t) => !picked.includes(t)),
+    n - picked.length,
     dedupe,
   )
-  return [...texts, ...more]
+  return [...picked, ...more]
 }
 
 async function driveFriend(
@@ -185,7 +180,12 @@ async function driveFriend(
   log.info("挑选本轮文案", { friend: friend.name, own: pool.length, fallback: fallback.length, texts })
   if (s.dryRun) return { status: "skipped", messages: 0, reason: "dry-run 未发送" }
   if (left <= 0) return { status: "skipped", messages: 0, reason: "已达当日上限" }
-  if (texts.length === 0) return { status: "skipped", messages: 0, reason: "无可用文案" }
+  if (texts.length === 0) {
+    // 有专属但被本轮前面好友轮空：明确记下来，用户看一眼就知道该加专属文案了，
+    // 而不是莫名其妙"无可用文案"
+    const reason = pool.length > 0 ? "专属文案已轮空（不使用全局）" : "无可用文案"
+    return { status: "skipped", messages: 0, reason }
+  }
 
   let sent = 0
   for (const text of texts) {
