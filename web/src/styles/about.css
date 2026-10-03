@@ -1,0 +1,17 @@
+/* 关于页：复用 components-view / component-section 骨架，这里只补页面自有元素 */
+.about-intro { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 22px; }
+.about-repo { margin: 0; color: var(--text-muted); font-size: 12px; }
+.about-repo a { color: var(--signal-deep); text-decoration: none; }
+.about-repo a:hover { text-decoration: underline; }
+
+.about-row-label { display: flex; min-width: 0; align-items: center; gap: 7px; color: #3e414b; font-size: 13px; font-weight: 570; }
+.about-row-label svg { color: #8a8e98; }
+.about-row-value { color: var(--text-secondary); font-size: 12px; text-align: right; }
+
+.about-features { margin: 0; padding: 0; list-style: none; }
+.about-features li { position: relative; padding-left: 16px; color: var(--text-secondary); font-size: 13px; line-height: 24px; }
+.about-features li::before { position: absolute; top: 11px; left: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--signal); content: ""; }
+
+@media (max-width: 640px) {
+  .about-row-value { text-align: left; }
+}

@@ -1,4 +1,4 @@
-import { LayoutDashboard, MessageSquareText, ScrollText, Settings, UserRound, UsersRound } from 'lucide-vue-next'
+import { Info, LayoutDashboard, MessageSquareText, ScrollText, Settings, UserRound, UsersRound } from 'lucide-vue-next'
 import type { AppRouteName } from './routes'
 
 export const navigationItems = [
@@ -8,4 +8,5 @@ export const navigationItems = [
   { name: 'messages' as AppRouteName, label: '文案池', icon: MessageSquareText, shortcut: 'G M' },
   { name: 'logs' as AppRouteName, label: '运行日志', icon: ScrollText, shortcut: 'G L' },
   { name: 'settings' as AppRouteName, label: '运行设置', icon: Settings, shortcut: 'G S' },
+  { name: 'about' as AppRouteName, label: '关于', icon: Info, shortcut: 'G B' },
 ]

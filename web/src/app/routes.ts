@@ -1,6 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 
-export type AppRouteName = 'login' | 'dashboard' | 'accounts' | 'friends' | 'messages' | 'settings' | 'logs'
+export type AppRouteName = 'login' | 'dashboard' | 'accounts' | 'friends' | 'messages' | 'settings' | 'logs' | 'about'
 
 export type PageMeta = {
   title: string
@@ -16,6 +16,7 @@ export const routeMeta: Record<AppRouteName, PageMeta> = {
   messages: { title: '文案池', description: '维护全局文案与账号专属文案。', requiresAuth: true },
   settings: { title: '运行设置', description: '调度窗口、发送节奏与通知策略。', requiresAuth: true },
   logs: { title: '运行日志', description: '追踪每次运行的执行明细与失败原因。', requiresAuth: true },
+  about: { title: '关于', description: '项目介绍、技术栈与源码地址。', requiresAuth: true },
 }
 
 const loginPage = () => import('@/pages/LoginPage.vue')
@@ -26,6 +27,7 @@ const friendsPage = () => import('@/pages/FriendsPage.vue')
 const messagesPage = () => import('@/pages/MessagesPage.vue')
 const settingsPage = () => import('@/pages/SettingsPage.vue')
 const logsPage = () => import('@/pages/LogsPage.vue')
+const aboutPage = () => import('@/pages/AboutPage.vue')
 
 export const routes: RouteRecordRaw[] = [
   { path: '/login', name: 'login', component: loginPage, meta: routeMeta.login },
@@ -39,6 +41,7 @@ export const routes: RouteRecordRaw[] = [
       { path: 'messages', name: 'messages', component: messagesPage, meta: routeMeta.messages },
       { path: 'settings', name: 'settings', component: settingsPage, meta: routeMeta.settings },
       { path: 'logs', name: 'logs', component: logsPage, meta: routeMeta.logs },
+      { path: 'about', name: 'about', component: aboutPage, meta: routeMeta.about },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },
