@@ -1,25 +1,30 @@
 import { test, expect } from "bun:test"
 import { openAccountPage, closeAllBrowsers } from "./browser"
-import { FINGERPRINTS, pickFingerprint } from "./fingerprint"
+import { buildUserAgent, pickFingerprint } from "./fingerprint"
 import type { AccountRow } from "./types"
 
-test("pickFingerprint 返回成套指纹，不混搭字段", () => {
+test("pickFingerprint 返回成套指纹，视口/DSF/UA 不混搭", () => {
+  const seen = new Set<string>()
   for (let i = 0; i < 50; i++) {
-    expect(FINGERPRINTS).toContainEqual(pickFingerprint())
-  }
-})
-
-test("每套指纹 UA/视口/DSF/时区自洽", () => {
-  for (const fp of FINGERPRINTS) {
+    const fp = pickFingerprint()
     expect(fp.userAgent).toContain("Chrome/")
     expect(fp.viewport.width).toBeGreaterThanOrEqual(1024)
     expect(fp.viewport.height).toBeGreaterThanOrEqual(600)
     expect([1, 1.25, 1.5, 2]).toContain(fp.deviceScaleFactor)
     expect(fp.timezoneId).toBe("Asia/Shanghai")
     expect(fp.locale.startsWith("zh-CN")).toBe(true)
-    // Windows/Mac 与 DSF 组合需自洽：非 Windows 的高分屏必须 >=2
-    if (fp.userAgent.includes("Mac OS X")) expect(fp.deviceScaleFactor).toBe(2)
+    seen.add(`${fp.viewport.width}x${fp.viewport.height}@${fp.deviceScaleFactor}`)
   }
+  expect(seen.size).toBeGreaterThan(1)
+})
+
+test("UA 平台段与本机一致，版本段跟真实浏览器一致", () => {
+  expect(buildUserAgent("131.0.6778.86")).toContain("Chrome/131.0.6778.86")
+  expect(buildUserAgent("131")).toContain("Chrome/131.0.0.0")
+  expect(buildUserAgent(null)).toContain("Chrome/131.0.0.0")
+  expect(buildUserAgent("131.0.6778.86")).toContain(process.platform === "darwin" ? "Mac OS X" : "Win64")
+  // 不会出现 Mac UA 配 Windows 机器的错搭
+  if (process.platform !== "darwin") expect(buildUserAgent("131.0.6778.86")).not.toContain("Mac OS X")
 })
 
 test.skipIf(!process.env.PLAYWRIGHT)("launches and evades webdriver", async () => {

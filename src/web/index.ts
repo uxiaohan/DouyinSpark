@@ -9,21 +9,19 @@ import {
   deleteMessage,
   deleteSession,
   getSession,
-  getSetting,
   listAccounts,
   listFriends,
   listMessages,
   listRunItems,
   listRuns,
   saveSession,
-  setSetting,
   updateAccount,
 } from "../repo"
 import { computeNextRunAt } from "../scheduler"
 import { isRunning, requestStop, runOnce } from "../runner"
 import { log } from "../logger"
 import { sendPushDeer } from "../notify"
-import { hashPassword, issueSession, verifyPassword } from "./auth"
+import { issueSession, readPasswordHash, verifyPassword, writePasswordHash } from "./auth"
 import type { AccountRow, Bool, RunItemRow, RuntimeSettings } from "../types"
 
 const COOKIE = "session"
@@ -91,7 +89,7 @@ export function createApp(): Hono {
     const body = (await c.req.json().catch(() => null)) as { password?: string } | null
     const password = body?.password
     if (typeof password !== "string" || password.length === 0) return c.json({ error: "口令不能为空" }, 400)
-    const hash = getSetting("admin_password_hash")
+    const hash = readPasswordHash()
     if (hash) {
       if (!(await verifyPassword(password, hash))) {
         noteFailure(ip)
@@ -99,7 +97,7 @@ export function createApp(): Hono {
       }
     } else {
       // 首次访问：一次性初始化口令
-      setSetting("admin_password_hash", await hashPassword(password))
+      await writePasswordHash(password)
     }
     clearFailures(ip)
     const { token, expiresAt } = await issueSession()
@@ -116,7 +114,7 @@ export function createApp(): Hono {
     return c.json({ ok: true })
   })
 
-  app.get("/api/bootstrap", (c) => c.json({ initialized: getSetting("admin_password_hash") !== null }))
+  app.get("/api/bootstrap", (c) => c.json({ initialized: readPasswordHash() !== null }))
 
   app.get("/api/settings", (c) => c.json(loadSettings()))
 

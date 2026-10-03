@@ -59,7 +59,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   })
   if (res.status === 401) {
-    if (location.pathname !== '/login') location.href = '/login'
+    // hash 路由下 pathname 永远是 /，改 path 会整页刷新；直接换 hash 让路由守卫接管
+    if (!location.hash.startsWith('#/login')) location.hash = '#/login'
     throw new Error('未登录')
   }
   if (!res.ok) {

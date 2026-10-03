@@ -44,6 +44,22 @@ test("错误口令登录返回 401", async () => {
   expect(await login("wrong")).toBeNull()
 })
 
+// 回归：口令哈希经 settings 表存取，getSetting 返回的是 JSON 编码串。
+// 若直接把原始返回值喂给 verify，除了首次登录（写入侧）之外全部会 401，管理员被锁死。
+test("同一口令重复登录都应成功", async () => {
+  expect(await login(PW)).not.toBeNull()
+  expect(await login(PW)).not.toBeNull()
+  expect(await login(PW)).not.toBeNull()
+})
+
+test("首次登录后 /api/bootstrap 报告已初始化", async () => {
+  const before = await app.request("/api/bootstrap")
+  expect(((await before.json()) as { initialized: boolean }).initialized).toBe(false)
+  expect(await login(PW)).not.toBeNull()
+  const after = await app.request("/api/bootstrap")
+  expect(((await after.json()) as { initialized: boolean }).initialized).toBe(true)
+})
+
 test("登录后带 cookie 访问 /api/settings 返回 200", async () => {
   const cookie = await login(PW)
   expect(cookie).not.toBeNull()

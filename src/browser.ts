@@ -45,12 +45,21 @@ export async function getBrowser(proxy: ProxySetting | null): Promise<Browser> {
   return browser
 }
 
+/** 浏览器版本拿不到时返回 null，指纹退回通用版本号 */
+function browserVersion(browser: Browser): string | null {
+  try {
+    return browser.version()
+  } catch {
+    return null
+  }
+}
+
 export async function openAccountPage(account: AccountRow): Promise<AccountPage> {
-  const fp = pickFingerprint()
   const proxy: ProxySetting | null = account.proxy_server
     ? { server: account.proxy_server, username: account.proxy_username, password: account.proxy_password }
     : null
   const browser = await getBrowser(proxy)
+  const fp = pickFingerprint(browserVersion(browser))
   const context = await browser.newContext({
     userAgent: fp.userAgent,
     viewport: fp.viewport,
