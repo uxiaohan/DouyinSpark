@@ -99,13 +99,21 @@
 .dialog-form label { margin-top: 5px; color: #4d5059; font-size: 12px; font-weight: 590; }
 .dialog-form input { height: 36px; border-radius: 6px; font-size: 13px; }
 .dialog-log { max-height: 264px; margin-inline: -4px; padding-inline: 4px; overflow-y: auto; border-top: 1px solid var(--line-subtle); }
-.dialog-log > div { display: grid; min-height: 54px; padding: 8px 2px; align-items: center; gap: 9px; grid-template-columns: 40px minmax(0, 1fr) 16px; border-bottom: 1px solid var(--line-subtle); }
-.dialog-log time { color: var(--text-muted); font-size: 12px; }
-.dialog-log strong,
-.dialog-log small { display: block; }
-.dialog-log strong { color: var(--text-default); font-size: 13px; font-weight: 600; line-height: 20px; }
-.dialog-log small { margin-top: 1px; color: var(--text-muted); font-size: 12px; line-height: 18px; }
-.dialog-log svg { color: #a1a4ac; }
+.dialog-log .log-item { display: grid; min-height: 52px; padding: 9px 2px; align-items: center; gap: 10px; grid-template-columns: 42px 22px minmax(0, 1fr) auto; border-bottom: 1px solid var(--line-subtle); }
+.dialog-log .log-item:last-child { border-bottom: 0; }
+.dialog-log time { color: var(--text-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.log-item-icon { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 6px; background: #f0f1f4; color: var(--text-muted); }
+.log-item--success .log-item-icon { color: var(--success); background: rgb(19 128 94 / 0.09); }
+.log-item--failed .log-item-icon { color: var(--danger); background: rgb(199 53 53 / 0.08); }
+.log-item--skipped .log-item-icon { color: var(--warning); background: rgb(165 91 22 / 0.09); }
+.log-item-copy { min-width: 0; }
+.log-item-copy strong { display: block; color: var(--text-default); font-size: 13px; font-weight: 600; line-height: 19px; }
+.log-item-copy small { display: block; margin-top: 1px; overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.log-item-badge { height: 22px; padding: 0 8px; border-radius: 5px; font-size: 12px; font-weight: 590; line-height: 20px; white-space: nowrap; }
+.log-item--success .log-item-badge { color: var(--success); background: rgb(19 128 94 / 0.09); }
+.log-item--failed .log-item-badge { color: var(--danger); background: rgb(199 53 53 / 0.08); }
+.log-item--skipped .log-item-badge { color: var(--warning); background: rgb(165 91 22 / 0.09); }
+.dialog-log .empty-state { display: grid; height: 88px; place-content: center; gap: 2px; }
 .showcase-sheet { width: min(390px, 92vw) !important; padding: 20px; }
 .sheet-summary { display: flex; margin-top: 16px; padding: 14px 0; align-items: center; gap: 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .sheet-summary strong { display: block; color: #3d4048; font-size: 13px; line-height: 20px; }
@@ -165,4 +173,6 @@
   .status-sample-row { padding-inline: 14px; }
   .component-table-footer { padding-inline: 14px; }
   .sheet-actions { grid-template-columns: 1fr; }
+  .dialog-log .log-item { gap: 8px; grid-template-columns: 22px minmax(0, 1fr) auto; }
+  .dialog-log .log-item time { display: none; }
 }
