@@ -1,8 +1,11 @@
-:root {
-  color-scheme: light;
-  font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-}
-
-* { box-sizing: border-box; }
-
-body { margin: 0; background: #f5f6f8; color: #22262c; }
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/auth.css";
+@import "./styles/shell.css";
+@import "./styles/dashboard.css";
+@import "./styles/users.css";
+@import "./styles/activity.css";
+@import "./styles/feedback.css";
+@import "./styles/console.css";

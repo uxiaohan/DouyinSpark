@@ -138,12 +138,12 @@ export function deleteFriend(id: number): void {
   db.query("DELETE FROM friends WHERE id = ?").run(id)
 }
 
-/** accountId: undefined → 全部；null → 仅全局文案；数字 → 该账号文案 */
+/** accountId: undefined → 全部；null → 仅全局文案；数字 → 该账号文案。新的在前面（id 倒序） */
 export function listMessages(accountId?: number | null): MessageRow[] {
-  if (accountId === undefined) return db.query("SELECT * FROM messages ORDER BY id").all() as MessageRow[]
+  if (accountId === undefined) return db.query("SELECT * FROM messages ORDER BY id DESC").all() as MessageRow[]
   if (accountId === null)
-    return db.query("SELECT * FROM messages WHERE account_id IS NULL ORDER BY id").all() as MessageRow[]
-  return db.query("SELECT * FROM messages WHERE account_id = ? ORDER BY id").all(accountId) as MessageRow[]
+    return db.query("SELECT * FROM messages WHERE account_id IS NULL ORDER BY id DESC").all() as MessageRow[]
+  return db.query("SELECT * FROM messages WHERE account_id = ? ORDER BY id DESC").all(accountId) as MessageRow[]
 }
 
 export function createMessage(accountId: number | null, text: string): number {

@@ -1,0 +1,39 @@
+/* 续火花控制台页面补充样式（复用模板 class 体系外的少量新增） */
+
+/* 登录页：口令输入框与登录按钮之间留出间距 */
+.login-form .login-submit-effect { margin-top: 14px; }
+
+/* 仪表盘操作区 */
+.console-actions { display: flex; padding: 14px 0 4px; align-items: center; gap: 8px; }
+
+/* 好友/文案页的账号范围切换 */
+.console-tabs { display: flex; padding: 14px 16px 2px; align-items: center; gap: 10px; }
+
+/* 表格行内操作 */
+.row-actions { display: flex; align-items: center; gap: 4px; }
+
+/* 文案单元格允许换行 */
+.message-cell { max-width: 560px; white-space: pre-wrap; word-break: break-all; }
+
+/* 设置页数字输入 */
+.console-number { height: 32px; padding: 0 10px; color: var(--text-default); border: 1px solid var(--control-border); border-radius: 6px; background: #fff; font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; }
+.console-number:focus-visible { outline: 2px solid rgb(var(--signal-rgb) / 0.5); outline-offset: 1px; border-color: var(--signal); }
+
+/* 设置页开关 */
+.console-switch { position: relative; display: inline-flex; width: 34px; height: 20px; flex: 0 0 auto; align-items: center; cursor: pointer; }
+.console-switch input { position: absolute; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.console-switch i { width: 34px; height: 20px; border: 1px solid var(--control-border); border-radius: 999px; background: #e8eaee; transition: background 180ms var(--ease-out), border-color 180ms var(--ease-out); }
+.console-switch i::after { display: block; width: 14px; height: 14px; margin: 2px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.2); content: ""; transition: translate 180ms var(--ease-out); }
+.console-switch input:checked + i { border-color: var(--signal); background: var(--signal); }
+.console-switch input:checked + i::after { translate: 14px 0; }
+.console-switch input:focus-visible + i { outline: 2px solid rgb(var(--signal-rgb) / 0.5); outline-offset: 2px; }
+
+/* 日志时间线展开态 */
+.timeline-row.is-expanded > div:nth-child(2) { padding-bottom: 14px; }
+.timeline-row.is-expanded .timeline-axis i { bottom: 0; }
+.timeline-row .dialog-log { margin-top: 8px; }
+
+@media (max-width: 640px) {
+  .console-actions { flex-wrap: wrap; }
+  .console-tabs { overflow-x: auto; }
+}
