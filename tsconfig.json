@@ -26,5 +26,8 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+
+  // web/ 拥有自己的 tsconfig（含 DOM lib），由 web:build 的 vue-tsc 负责类型检查
+  "include": ["*.ts", "src/**/*.ts"]
 }
