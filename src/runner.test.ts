@@ -200,3 +200,30 @@ test("count 为 0 或负数：不发", () => {
   expect(pickFriendTexts(["专属甲"], ["全局一"], 0, true)).toEqual([])
   expect(pickFriendTexts(["专属甲"], ["全局一"], -3, true)).toEqual([])
 })
+
+// 回归（用户 run 22 真机反馈）：同账户两个好友收到了同一条文案。
+// 专属池只有一条时"专属优先"会让每个好友都挑到它，所以挑选要避开本轮
+// 前面好友已挑走的文案；第二个好友自动落到全局，宁可换文案不重复。
+test("前面好友挑走的文案不再挑：同账户多好友不同文案", () => {
+  for (let i = 0; i < 50; i++) {
+    const texts = pickFriendTexts(["专属甲"], ["全局一", "全局二"], 1, true, new Set(["专属甲"]))
+    expect(texts.length).toBe(1)
+    expect(["全局一", "全局二"]).toContain(texts[0]!)
+  }
+})
+
+test("整池被用光：允许重复补足，好过没得发", () => {
+  for (let i = 0; i < 50; i++) {
+    // 专属和全局都被前面好友用光：从两池里重复挑一条，长度必须补足
+    const texts = pickFriendTexts(["专属甲"], ["全局一"], 1, true, new Set(["专属甲", "全局一"]))
+    expect(texts.length).toBe(1)
+    expect(["专属甲", "全局一"]).toContain(texts[0]!)
+  }
+})
+
+test("used 只挡已用文案：没用过的照常挑", () => {
+  for (let i = 0; i < 50; i++) {
+    const texts = pickFriendTexts(["专属甲", "专属乙"], ["全局一"], 1, true, new Set(["专属甲"]))
+    expect(texts).toEqual(["专属乙"])
+  }
+})

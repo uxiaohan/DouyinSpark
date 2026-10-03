@@ -124,6 +124,11 @@ export function summarize(
  * 以前两类文案在 loadRunConfig 里合成一个池、sampleN 全场随机抽——专属只有
  * 一两条时会被全局淹没（用户实测：8 条池子里 1 条专属，抽中概率 1/8，
  * 真发了一批全是公共文案），"专属在前、全局兜底"的注释形同虚设。
+ *
+ * used 是本轮跑批里**前面好友已经挑走**的文案：同账户多好友不发同一条
+ * （用户实测两个好友收到同一文案）。专属池只有一条时，第二个好友会自动
+ * 落到全局——宁可换文案，也不对两个人说一样的话。
+ * 池子被用光时才允许重复：这个好友没得发比重复更糟。
  * 跨池去重无条件做：同一条文案发给同一个好友两遍，不管是哪个设置都不像话。
  */
 export function pickFriendTexts(
@@ -131,17 +136,28 @@ export function pickFriendTexts(
   fallback: readonly string[],
   count: number,
   dedupe: boolean,
+  used: ReadonlySet<string> = new Set(),
 ): string[] {
   const n = Math.max(0, count)
-  const own = sampleN(messages, n, dedupe)
-  if (own.length >= n) return own
-  const used = new Set(own)
-  const rest = sampleN(
-    fallback.filter((t) => !used.has(t)),
-    n - own.length,
+  const own = sampleN(
+    messages.filter((t) => !used.has(t)),
+    n,
     dedupe,
   )
-  return [...own, ...rest]
+  const need = n - own.length
+  // 兜底也要避开已挑走的：跨好友的 used + 这个好友已经挑到的 own，
+  // 同一条发给同一个好友两遍，不管是哪个设置都不像话
+  const taken = new Set([...used, ...own])
+  const rest = need > 0 ? sampleN(fallback.filter((t) => !taken.has(t)), need, dedupe) : []
+  const texts = [...own, ...rest]
+  if (texts.length >= n) return texts
+  // 整池被前面好友用光：放开 used 限制补足，重复好过没得发
+  const more = sampleN(
+    [...messages, ...fallback].filter((t) => !texts.includes(t)),
+    n - texts.length,
+    dedupe,
+  )
+  return [...texts, ...more]
 }
 
 async function driveFriend(
@@ -151,6 +167,7 @@ async function driveFriend(
   fallback: string[],
   s: RuntimeSettings,
   capLeft: () => number,
+  used: Set<string>,
 ): Promise<FriendOutcome> {
   const opened = await openConversation(page, friend.name, s.maxScrollAttempts)
   if (!opened) return { status: "skipped", messages: 0, reason: "未找到会话" }
@@ -160,7 +177,9 @@ async function driveFriend(
 
   const left = capLeft()
   const want = randInt(s.perFriendMessages[0], Math.max(s.perFriendMessages[0], s.perFriendMessages[1]))
-  const texts = pickFriendTexts(pool, fallback, Math.min(want, Math.max(left, 0)), s.dedupeMessagesPerFriend)
+  const texts = pickFriendTexts(pool, fallback, Math.min(want, Math.max(left, 0)), s.dedupeMessagesPerFriend, used)
+  // 挑完就登记：同账户下一个好友不再挑到同一条（多好友不发重复文案）
+  for (const t of texts) used.add(t)
   // 挑选提前到 dry-run 判断之前 + 打日志： dry-run 也能核对"将会发什么"，
   // 专属/全局的挑选优先级出问题不用真发就能发现（结果判定顺序不变）
   log.info("挑选本轮文案", { friend: friend.name, own: pool.length, fallback: fallback.length, texts })
@@ -223,13 +242,15 @@ async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountR
 
     const order = s.shuffleFriends ? shuffle(friends) : friends
     const result: AccountResult = { ...base, friends: [] }
+    // 本轮这个账号已挑走的文案：同账户多好友不发同一条（跨好友去重）
+    const usedTexts = new Set<string>()
     for (const friend of order) {
       if (state.aborted || state.shouldStop()) {
         result.friends.push({ friendId: friend.id, name: friend.name, status: "skipped", messages: 0, reason: "跑批已停止" })
         addRunItem({ run_id: state.runId, account_id: account.id, friend_id: friend.id, friend_name: friend.name, status: "skipped", messages: 0, reason: "跑批已停止" })
         continue
       }
-      const fr = await handleFriend(friend, state, (f) => driveFriend(page, f, messages, fallbackMessages, s, capLeft))
+      const fr = await handleFriend(friend, state, (f) => driveFriend(page, f, messages, fallbackMessages, s, capLeft, usedTexts))
       result.friends.push(fr)
       addRunItem({ run_id: state.runId, account_id: account.id, friend_id: friend.id, friend_name: friend.name, status: fr.status, messages: fr.messages, reason: fr.reason })
       if (fr.messages > 0) {
