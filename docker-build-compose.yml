@@ -1,6 +1,7 @@
 # 本地构建版：从当前源码 build 再运行，改代码自测用。
-# 默认的 docker-compose.yml 是「直接运行 GHCR 已发布镜像」版本，别混用；两者共用同一项目名和数据卷。
-# 容器常驻，调度循环随容器一起活着；数据在命名卷里，重建不丢
+# 默认的 docker-compose.yml 是「直接运行 GHCR 已发布镜像」版本；两者都挂 ./data 到 /app/data，
+# 指向同一份数据，别同时跑（SQLite 会撞锁）。
+# 容器常驻，调度循环随容器一起活着
 services:
   douyinspark:
     build: .
@@ -14,13 +15,10 @@ services:
     environment:
       TZ: "${DOUYIN_TZ:-Asia/Shanghai}"
     volumes:
-      - douyinspark-data:/app/data
+      - ./data:/app/data
     # 容器日志不设上限会把磁盘吃光；滚动保留最近 3 份 10MB
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  douyinspark-data:

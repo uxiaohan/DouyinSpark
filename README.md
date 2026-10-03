@@ -144,10 +144,11 @@ docker compose -f docker-build-compose.yml up -d --build
 
 | 项 | 说明 |
 |---|---|
-| 数据 | 全在命名卷 `douyinspark-data`（对应容器内 `/app/data`）。`docker compose down` 不丢数据，`down -v` 才会删卷 |
+| 数据 | 绑定挂载 `./data`（compose 文件同级的 data 目录）到容器 `/app/data`。app.db 就躺在那里，看得见摸得着；`docker compose down` 不碰它，想删数据只能手动删目录 |
 | 时区 | 固定 `TZ=Asia/Shanghai`。调度窗口按容器本地时间算，改 TZ 会让每天运行点整体漂移 |
 | 手动跑一批 | `docker compose exec douyinspark bun run now` |
-| 迁移旧数据 | 把本机 `data/app.db`（含 wal/shm）拷进卷：先 `docker compose down`，`docker cp data/app.db douyinspark:/app/data/app.db`，再 `docker compose up -d` |
+| 迁移旧数据 | 把本机 `data/app.db`（连同 `-wal` / `-shm`，如果有）复制到 compose 同级的 `./data/`，再 `docker compose up -d`。**同一台机器上别让本机控制台和容器同时跑**：两边共用同一个 SQLite 库，WAL 跨进程锁在 Windows 上会报 `database is locked` |
+| 绑定挂载权限 | 容器内运行用户是 uid/gid 1000（bun）。Linux 宿主先 `sudo chown -R 1000:1000 ./data`；Windows Docker Desktop 首次挂 D 盘需在 Settings → Resources → File Sharing 里放行 |
 | 换端口 | `DOUYIN_PORT=9000 docker compose up -d` |
 | 停机 | `docker stop` 发 SIGTERM，会等当前好友边界收尾再退出（优雅停机，最多 2 分钟）；容器内再次收到信号才强制退 |
 | 日志 | json-file 滚动：单文件上限 10MB，保留 3 份 |

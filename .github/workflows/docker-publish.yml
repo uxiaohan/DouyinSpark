@@ -1,5 +1,5 @@
 # 手动触发：构建镜像并推送到 GitHub Container Registry（ghcr.io）。
-# Actions → Publish Docker image → Run workflow；可选填标签（默认 latest）。
+# Actions → Publish Docker image → Run workflow；每次自动打 sha-<短commit> 标签，另按输入打 latest / 版本标签。
 name: Publish Docker image
 
 on:
@@ -13,6 +13,10 @@ on:
         description: 目标平台（多架构构建慢，默认只出 amd64）
         required: false
         default: linux/amd64
+      move_latest:
+        description: 是否把 latest 也指向这次构建（发版本标签、不想动 latest 就关掉）
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,7 +49,8 @@ jobs:
           push: true
           platforms: ${{ inputs.platforms }}
           tags: |
-            ${{ steps.meta.outputs.image }}:${{ inputs.tag || 'latest' }}
             ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.image }}:${{ inputs.tag || 'latest' }}
+            ${{ inputs.move_latest && format('{0}:latest', steps.meta.outputs.image) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
