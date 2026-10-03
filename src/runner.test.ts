@@ -3,7 +3,8 @@ import { test, expect, beforeEach } from "bun:test"
 import { DEFAULT_SETTINGS } from "./config"
 import type { AccountResult, AccountRuntime, FriendRow, RuntimeSettings } from "./types"
 import type { RunState } from "./runner"
-import { cookieExpiredResult, handleFriend, isRunning, pickFriendTexts, requestStop, resetStop, summarize } from "./runner"
+import { cookieExpiredResult, handleFriend, isRunning, persistAccountItems, pickFriendTexts, requestStop, resetStop, summarize } from "./runner"
+import { createRun, listRunItems } from "./repo"
 
 const friend = (id: number, name: string): FriendRow => ({ id, account_id: 1, name, created_at: "" })
 
@@ -157,6 +158,39 @@ test("skip（未找到会话）不触发重试也不计连续失败", async () =
 
 test("isRunning 初始为 false", () => {
   expect(isRunning()).toBe(false)
+})
+
+// 回归（用户实测 2026-10-04 run 34）：账号 cookie 失效时 summary 里记了 skipped、
+// 运行状态显示「部分失败」，但 run_items 一条都没写——日志页展开只剩成功的那条，
+// 失败原因无影踪。账号级提前返回（cookie 失效/已达上限/打不开页面/风控）的明细
+// 必须和正常路径一样落账。
+test("cookie 失效账号的好友明细也落 run_items（带原因）", () => {
+  const runId = createRun("schedule")
+  const result = cookieExpiredResult(runtime(), "cookie 失效/未登录")
+  persistAccountItems(runId, result.accountId, result.friends)
+  const rows = listRunItems(runId)
+  expect(result.friends.length).toBe(2)
+  expect(rows.length).toBe(2)
+  for (const row of rows) {
+    expect(row.status).toBe("skipped")
+    expect(row.reason).toBe("cookie 失效")
+    expect(row.messages).toBe(0)
+  }
+})
+
+test("persistAccountItems 原样落账成功/失败/跳过各状态", () => {
+  const runId = createRun("manual")
+  persistAccountItems(runId, 7, [
+    { friendId: 1, name: "张三", status: "success", messages: 2, reason: null },
+    { friendId: 2, name: "李四", status: "failed", messages: 0, reason: "验证码" },
+    { friendId: 3, name: "王五", status: "skipped", messages: 0, reason: "已达当日上限" },
+  ])
+  const rows = listRunItems(runId)
+  expect(rows.length).toBe(3)
+  expect(rows.map((r) => r.status)).toEqual(["success", "failed", "skipped"])
+  expect(rows.every((r) => r.account_id === 7)).toBe(true)
+  expect(rows[1]!.reason).toBe("验证码")
+  expect(rows[0]!.messages).toBe(2)
 })
 
 // 回归（用户真机 run 22）：专属与全局文案曾合成一个池随机抽，8 条池子里 1 条

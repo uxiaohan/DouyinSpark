@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { CircleAlert, CircleCheck, CircleX, Clock3, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { api, type Run, type RunItem } from '@/api'
+import { api, type Account, type Run, type RunItem } from '@/api'
 
 defineEmits<{ toast: [message: string, tone?: 'success' | 'info' | 'warning' | 'error'] }>()
 
@@ -12,6 +12,8 @@ const statusFilter = ref('all')
 const expanded = ref<Set<number>>(new Set())
 const items = ref<Map<number, RunItem[]>>(new Map())
 const loading = ref(false)
+// 同一备注可以挂在多个账号下（实测两个账号各有「奥特曼🎊刁刁」），明细里带上账号别名才分得清
+const accountAlias = ref<Map<number, string>>(new Map())
 
 const filtered = computed(() => {
   if (statusFilter.value === 'all') return runs.value
@@ -57,13 +59,18 @@ function formatTime(iso: string) {
 async function load() {
   loading.value = true
   try {
-    const res = await api.listRuns()
+    const [res, accountRes] = await Promise.all([api.listRuns(), api.listAccounts().catch(() => ({ items: [] as Account[] }))])
     runs.value = res.items
+    accountAlias.value = new Map(accountRes.items.map((a) => [a.id, a.alias]))
     items.value = new Map()
     expanded.value = new Set()
   } finally {
     loading.value = false
   }
+}
+
+function aliasOf(accountId: number | null): string | null {
+  return accountId === null ? null : accountAlias.value.get(accountId) ?? null
 }
 
 async function toggle(run: Run) {
@@ -122,7 +129,7 @@ onMounted(load)
                   <CircleAlert v-else :size="12" />
                 </span>
                 <div class="log-item-copy">
-                  <strong>{{ item.friend_name || '未知好友' }}</strong>
+                  <strong>{{ item.friend_name || '未知好友' }}<span v-if="aliasOf(item.account_id)" class="log-item-account">{{ aliasOf(item.account_id) }}</span></strong>
                   <small v-if="item.status === 'success'">已发送 {{ item.messages }} 条</small>
                   <small v-else-if="item.reason">{{ item.reason }}</small>
                   <small v-else>无原因明细</small>

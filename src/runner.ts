@@ -72,6 +72,26 @@ function skippedAll(rt: AccountRuntime, reason: string): AccountResult {
 }
 
 /**
+ * 把账号结果里的每个好友明细落成 run_items。所有路径统一在这里落账——
+ * 包括 cookie 失效/已达当日上限/打不开页面/风控这些账号级提前返回，
+ * 否则 summary 里记了 skipped，日志页却一条明细都看不到（用户实测撞过：
+ * 「部分失败」展开只有成功的那条，失败原因无影踪）。
+ */
+export function persistAccountItems(runId: number, accountId: number, friends: FriendResult[]): void {
+  for (const f of friends) {
+    addRunItem({
+      run_id: runId,
+      account_id: accountId,
+      friend_id: f.friendId,
+      friend_name: f.name,
+      status: f.status,
+      messages: f.messages,
+      reason: f.reason,
+    })
+  }
+}
+
+/**
  * 单个好友的发送决策：retryPerFriend 次重试，成功/skip 即停；
  * 连续失败计数在这里维护，达阈值把整个运行置为 aborted。
  */
@@ -243,12 +263,10 @@ async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountR
     for (const friend of order) {
       if (state.aborted || state.shouldStop()) {
         result.friends.push({ friendId: friend.id, name: friend.name, status: "skipped", messages: 0, reason: "运行已停止" })
-        addRunItem({ run_id: state.runId, account_id: account.id, friend_id: friend.id, friend_name: friend.name, status: "skipped", messages: 0, reason: "运行已停止" })
         continue
       }
       const fr = await handleFriend(friend, state, (f) => driveFriend(page, f, messages, fallbackMessages, s, capLeft, usedTexts))
       result.friends.push(fr)
-      addRunItem({ run_id: state.runId, account_id: account.id, friend_id: friend.id, friend_name: friend.name, status: fr.status, messages: fr.messages, reason: fr.reason })
       if (fr.messages > 0) {
         sentInRun.value += fr.messages
         await sleep(randMs(s.gapBetweenFriendsMs))
@@ -280,7 +298,10 @@ export async function runOnce(trigger = "manual"): Promise<RunSummary> {
     const accounts: AccountResult[] = []
     for (const [i, rt] of cfg.accounts.entries()) {
       if (state.aborted || state.shouldStop()) break
-      accounts.push(await runAccount(rt, state))
+      const result = await runAccount(rt, state)
+      // 明细统一在这里落账：正常路径与账号级跳过（cookie 失效等）都要有痕
+      persistAccountItems(runId, rt.account.id, result.friends)
+      accounts.push(result)
       if (state.aborted || state.shouldStop()) break
       // 账号间隔只该落在账号之间：最后一个账号后再睡 30-90s 是纯浪费，
       // 连 notifyRun 推送都一起被拖晚（实测单账号运行 92.8s 里有 60s 花在这）
