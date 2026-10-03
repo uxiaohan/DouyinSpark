@@ -1,0 +1,51 @@
+# 手动触发：构建镜像并推送到 GitHub Container Registry（ghcr.io）。
+# Actions → Publish Docker image → Run workflow；可选填标签（默认 latest）。
+name: Publish Docker image
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 镜像标签（默认 latest，可写 v1.2.3）
+        required: false
+        default: latest
+      platforms:
+        description: 目标平台（多架构构建慢，默认只出 amd64）
+        required: false
+        default: linux/amd64
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GHCR 镜像名强制小写；同时算一个短 sha 做不可变标签
+      - name: 镜像名与标签
+        id: meta
+        run: |
+          echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "sha=$(echo '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: ${{ inputs.platforms }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ inputs.tag || 'latest' }}
+            ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

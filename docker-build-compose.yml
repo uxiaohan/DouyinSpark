@@ -1,8 +1,10 @@
-# 直接运行 GHCR 上已发布的镜像，不在本机构建。
-# 想从本地源码构建运行，用 docker-build-compose.yml；发布镜像见 README「Docker 部署」。
+# 本地构建版：从当前源码 build 再运行，改代码自测用。
+# 默认的 docker-compose.yml 是「直接运行 GHCR 已发布镜像」版本，别混用；两者共用同一项目名和数据卷。
+# 容器常驻，调度循环随容器一起活着；数据在命名卷里，重建不丢
 services:
   douyinspark:
-    image: ghcr.io/uxiaohan/douyinspark:${DOUYIN_TAG:-latest}
+    build: .
+    image: douyinspark:latest
     container_name: douyinspark
     restart: unless-stopped
     # Chromium 默认只用 64MB /dev/shm，页面一复杂就崩；放大到 1GB

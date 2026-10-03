@@ -102,18 +102,45 @@ bun run now
 
 ## Docker 部署
 
-整套跑在容器里，不依赖本机的 Bun / Chrome：多阶段构建（依赖 → 前端构建 → 运行镜像），
-运行镜像里只带生产依赖 + 内置 chromium（多架构 amd64/arm64）。
+整套跑在容器里，不依赖本机的 Bun / Chrome。两个 compose 文件分工：
+
+| 文件 | 用途 |
+|---|---|
+| `docker-compose.yml` | **直接运行** GHCR 上已发布的镜像（`ghcr.io/uxiaohan/douyinspark`），不在本机构建 |
+| `docker-build-compose.yml` | 从当前源码**本地构建**再运行，改代码自测用 |
+
+### 运行发布的镜像
 
 ```bash
-# 构建并启动（首次会拉基础镜像、装 chromium 系统库，几分钟）
-docker compose up -d --build
+# 首次 / 升级都是这两条
+docker compose pull
+docker compose up -d
 
+# 指定版本：DOUYIN_TAG=sha-1a2b3c4 docker compose up -d
 # 看日志，确认出现 "scheduler: 下次运行" 即调度循环就绪
 docker compose logs -f
 ```
 
 启动后访问 `http://<机器IP>:8787`。首次登录同本地：随便输一个口令即成为管理口令。
+
+GHCR 的 package 默认**私有**，拉不动就先登录（用有 `read:packages` 权限的 PAT）：
+
+```bash
+docker login ghcr.io
+```
+
+### 本地构建运行
+
+```bash
+docker compose -f docker-build-compose.yml up -d --build
+```
+
+### 发布镜像（GitHub Actions）
+
+仓库 **Actions → Publish Docker image → Run workflow**，可选填标签（默认 `latest`）。
+触发后基于**推送时的那个 commit** 构建 `linux/amd64`（平台框可填 `linux/amd64,linux/arm64` 出多架构，会慢不少），
+推到 `ghcr.io/uxiaohan/douyinspark:<tag>`，同时打一个 `sha-<短commit>` 的不可变标签方便回滚。
+所以改完代码先 push，再触发工作流。
 
 | 项 | 说明 |
 |---|---|
