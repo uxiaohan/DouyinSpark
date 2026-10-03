@@ -8,6 +8,7 @@
     "now": "bun run index.ts --now",
     "seed": "bun run src/seed.ts",
     "calibrate": "bun run src/calibrate.ts",
+    "web": "bun run web-server.ts",
     "build:web": "bun run --cwd web build",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
