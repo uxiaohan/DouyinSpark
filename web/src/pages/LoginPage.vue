@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { motion } from 'motion-v'
-import { ArrowRight, CircleAlert, KeyRound, ShieldCheck } from 'lucide-vue-next'
+import { ArrowRight, KeyRound, ShieldCheck } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import LoginTelemetry from '@/components/auth/LoginTelemetry.vue'
@@ -22,7 +22,6 @@ type Mode = 'loading' | 'setup' | 'login'
 const mode = ref<Mode>('loading')
 const form = reactive({ password: '', confirm: '' })
 const state = ref<'idle' | 'loading'>('idle')
-const error = ref('')
 
 const isSetup = computed(() => mode.value === 'setup')
 const submitLabel = computed(() => {
@@ -48,18 +47,17 @@ onMounted(async () => {
 })
 
 async function handleSubmit() {
-  error.value = ''
   if (!form.password) {
-    error.value = isSetup.value ? '请设置管理口令。' : '请输入控制台口令。'
+    showToast(isSetup.value ? '请设置管理口令。' : '请输入控制台口令。', 'warning')
     return
   }
   if (isSetup.value) {
     if (form.password.length < 6) {
-      error.value = '口令至少 6 位。'
+      showToast('口令至少 6 位。', 'warning')
       return
     }
     if (form.password !== form.confirm) {
-      error.value = '两次输入的口令不一致。'
+      showToast('两次输入的口令不一致。', 'warning')
       return
     }
   }
@@ -68,7 +66,7 @@ async function handleSubmit() {
   const result = isSetup.value ? await setupPassword(form.password, form.confirm) : await login(form.password)
   state.value = 'idle'
   if (!result.ok) {
-    error.value = result.error
+    showToast(result.error, 'error')
     return
   }
   showToast(isSetup.value ? '口令已设置，欢迎进入控制台' : '登录成功，欢迎回来', 'success')
@@ -93,7 +91,6 @@ async function handleSubmit() {
           <div class="field-label"><label for="confirm">确认口令</label></div>
           <Input id="confirm" v-model="form.confirm" type="password" autocomplete="new-password" placeholder="再输入一次" class="control-input" />
         </template>
-        <p v-if="error" role="alert" class="form-error"><CircleAlert :size="14" />{{ error }}</p>
         <ClickSpark class="login-submit-effect" :spark-count="5" :spark-size="5" :spark-radius="12" :duration="260">
           <Button type="submit" size="lg" class="primary-action w-full" :disabled="state === 'loading' || mode === 'loading'">
             <span v-if="state === 'loading'" class="spinner" />{{ submitLabel }}<ArrowRight v-if="state === 'idle' && mode !== 'loading'" data-icon="inline-end" />
