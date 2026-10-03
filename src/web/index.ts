@@ -25,6 +25,9 @@ import type { AccountRow, Bool, RuntimeSettings } from "../types"
 
 const COOKIE = "session"
 
+/** 初始化引导的最短口令长度；前端设置页同样按 6 位校验 */
+const SETUP_PASSWORD_MIN = 6
+
 /**
  * 登录尝试限流：按 IP 计时窗，超过 MAX_TRIES 返回 429。
  * 记的是失败尝试，避免误伤正常登录；内存实现，重启即清。
@@ -57,7 +60,7 @@ export function createApp(): Hono {
 
   app.use("/api/*", async (c, next) => {
     const path = c.req.path
-    if (path === "/api/login" || path === "/api/logout" || path === "/api/bootstrap") {
+    if (path === "/api/login" || path === "/api/logout" || path === "/api/bootstrap" || path === "/api/setup") {
       await next()
       return
     }
@@ -96,6 +99,24 @@ export function createApp(): Hono {
       await writePasswordHash(password)
     }
     clearFailures(ip)
+    const { token, expiresAt } = await issueSession()
+    saveSession(token, expiresAt)
+    c.header("set-cookie", `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Strict; Max-Age=86400`)
+    return c.json({ ok: true })
+  })
+
+  // 首次进入的初始化引导：只在没有口令哈希时开放。设置成功后直接发会话，
+  // 不用再跳回登录框输一遍。已初始化后此接口 409——改口令不存在这个流程，
+  // 登录接口保留的"首次输入即初始化"仅作 curl/脚本的兜底。
+  app.post("/api/setup", async (c) => {
+    if (readPasswordHash() !== null) return c.json({ error: "控制台已初始化，请直接登录" }, 409)
+    const body = (await c.req.json().catch(() => null)) as { password?: string; confirm?: string } | null
+    const password = body?.password
+    if (typeof password !== "string" || password.length < SETUP_PASSWORD_MIN) {
+      return c.json({ error: `口令至少 ${SETUP_PASSWORD_MIN} 位` }, 400)
+    }
+    if (password !== body?.confirm) return c.json({ error: "两次输入的口令不一致" }, 400)
+    await writePasswordHash(password)
     const { token, expiresAt } = await issueSession()
     saveSession(token, expiresAt)
     c.header("set-cookie", `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Strict; Max-Age=86400`)

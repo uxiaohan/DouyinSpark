@@ -74,6 +74,9 @@ export const api = {
   bootstrap: () => req<{ initialized: boolean }>('/bootstrap'),
   login: (password: string) =>
     req<{ ok: true }>('/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  // 首次进入的初始化引导；已初始化后后端返回 409，走登录
+  setup: (password: string, confirm: string) =>
+    req<{ ok: true }>('/setup', { method: 'POST', body: JSON.stringify({ password, confirm }) }),
   logout: () => req<{ ok: true }>('/logout', { method: 'POST' }),
 
   getSettings: () => req<Settings>('/settings'),

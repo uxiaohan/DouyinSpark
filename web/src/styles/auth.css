@@ -124,6 +124,14 @@
 .demo-credentials code { color: #343740; font-family: inherit; font-size: 12px; }
 .demo-credentials i { color: #b0b3ba; font-style: normal; }
 
+/* 首次进入的初始化引导说明卡 */
+.setup-guide { margin: 18px 0 0; padding: 12px 14px; border: 1px solid #e4e7ee; border-radius: 8px; background: rgb(255 255 255 / 0.6); }
+.setup-guide-title { display: flex; margin: 0 0 8px; align-items: center; gap: 6px; color: #3e414b; font-size: 12px; font-weight: 570; }
+.setup-guide-title svg { color: var(--signal); }
+.setup-guide ul { margin: 0; padding: 0; list-style: none; }
+.setup-guide li { position: relative; padding-left: 13px; color: #747781; font-size: 12px; line-height: 21px; }
+.setup-guide li::before { position: absolute; left: 2px; color: #b0b3ba; content: "·"; }
+
 .dingtalk-access { width: 400px; }
 .dingtalk-copy { margin: 0 0 24px; }
 .dingtalk-terminal { position: relative; width: 100%; margin: 0; padding: 12px 16px 14px; overflow: hidden; border: 1px solid #d7dae2; border-radius: 8px; background: #fff; transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out); }

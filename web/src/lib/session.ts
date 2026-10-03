@@ -61,6 +61,26 @@ export async function login(password: string): Promise<{ ok: true } | { ok: fals
   return { ok: false, error: detail?.error ?? `登录失败 ${res.status}` }
 }
 
+/** 首次初始化：设置口令并直接建立会话；409 表示别人已抢先初始化，退回登录 */
+export async function setupPassword(password: string, confirm: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  let res: Response
+  try {
+    res = await fetch('/api/setup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password, confirm }),
+    })
+  } catch {
+    return { ok: false, error: '网络异常，无法连接控制台服务' }
+  }
+  if (res.ok) {
+    state = 'authed'
+    return { ok: true }
+  }
+  const detail = (await res.json().catch(() => null)) as { error?: string } | null
+  return { ok: false, error: detail?.error ?? `初始化失败 ${res.status}` }
+}
+
 export async function logout(): Promise<void> {
   try {
     await api.logout()

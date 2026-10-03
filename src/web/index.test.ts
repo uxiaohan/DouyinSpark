@@ -64,6 +64,44 @@ test("首次登录后 /api/bootstrap 报告已初始化", async () => {
   expect(((await after.json()) as { initialized: boolean }).initialized).toBe(true)
 })
 
+async function setup(password: string, confirm = password): Promise<Response> {
+  return app.request("/api/setup", {
+    method: "POST",
+    body: JSON.stringify({ password, confirm }),
+    headers: { "content-type": "application/json" },
+  })
+}
+
+test("POST /api/setup 首次初始化：200、直接发会话、bootstrap 转 true、该口令可登录", async () => {
+  const res = await setup(PW)
+  expect(res.status).toBe(200)
+  const cookie = res.headers.get("set-cookie")?.split(";")[0]
+  expect(cookie).toContain("session=")
+  // 设置完不用再回登录框：带着响应里的 cookie 直接能进
+  expect((await app.request("/api/settings", { headers: { cookie: cookie! } })).status).toBe(200)
+  const after = await app.request("/api/bootstrap")
+  expect(((await after.json()) as { initialized: boolean }).initialized).toBe(true)
+  expect(await login(PW)).not.toBeNull()
+})
+
+test("POST /api/setup 两次输入不一致返回 400 且不落库", async () => {
+  expect((await setup(PW, "another-1")).status).toBe(400)
+  const after = await app.request("/api/bootstrap")
+  expect(((await after.json()) as { initialized: boolean }).initialized).toBe(false)
+})
+
+test("POST /api/setup 口令过短返回 400", async () => {
+  expect((await setup("12345")).status).toBe(400)
+})
+
+// 初始化引导只在"没有口令"时开放：已初始化后必须 409，且原口令不能被动过
+test("POST /api/setup 已初始化后返回 409 且原口令不变", async () => {
+  expect(await setup(PW)).toBeTruthy()
+  expect((await setup("brand-new-1")).status).toBe(409)
+  expect(await login(PW)).not.toBeNull()
+  expect(await login("brand-new-1")).toBeNull()
+})
+
 test("登录后带 cookie 访问 /api/settings 返回 200", async () => {
   const cookie = await login(PW)
   expect(cookie).not.toBeNull()
