@@ -2,7 +2,7 @@ import "./testhelper"
 import { test, expect, beforeEach } from "bun:test"
 import { DEFAULT_SETTINGS } from "./config"
 import type { RuntimeSettings } from "./types"
-import { computeNextRunAt, getNextRunAt, interruptibleSleep, planNextRun, resetNextRun, schedulerLoop, wakeScheduler } from "./scheduler"
+import { computeNextRunAt, getNextRunAt, interruptibleSleep, planNextRun, resetNextRun, schedulerLoop, wakeScheduler, windowEnd } from "./scheduler"
 import type { SchedulerDeps } from "./scheduler"
 
 const S: RuntimeSettings = {
@@ -51,6 +51,35 @@ test("跨零点窗口不会被当成已过", () => {
     const next = computeNextRunAt(night, now)
     expect(within(next, at(23, 0), new Date(2026, 9, 4, 1, 0))).toBe(true)
   }
+})
+
+// 回归：开始 == 结束时旧实现用 end <= start 把它判成跨零点，end 被推到次日，
+// 零长窗口悄悄变成 24 小时窗口、在全程均匀随机取点。实测 2026-10-04：
+// 用户设 01:04-01:04，保存后"下次运行"排到约 9 小时后的 09:56，而不是次日 01:04。
+// 零长窗口的语义是"每天到点就跑"，必须精确落在开始时刻。
+test("零长窗口（开始 == 结束）：开始前 → 今日开始时刻", () => {
+  const dot: RuntimeSettings = { ...S, schedule: { startHour: 8, startMinute: 0, endHour: 8, endMinute: 0 } }
+  for (let i = 0; i < 20; i++) {
+    expect(computeNextRunAt(dot, at(7, 0)).getTime()).toBe(at(8, 0).getTime())
+  }
+})
+
+test("零长窗口：开始后 → 次日同一时刻", () => {
+  const dot: RuntimeSettings = { ...S, schedule: { startHour: 8, startMinute: 0, endHour: 8, endMinute: 0 } }
+  for (let i = 0; i < 20; i++) {
+    expect(computeNextRunAt(dot, at(8, 30)).getTime()).toBe(new Date(2026, 9, 4, 8, 0).getTime())
+  }
+})
+
+test("零长窗口跑完一轮后排到次日同一时刻，不会连跑", () => {
+  const dot: RuntimeSettings = { ...S, schedule: { startHour: 20, startMinute: 0, endHour: 20, endMinute: 0 } }
+  const runAt = at(20, 0) // 到点触发
+  // windowEnd 对零长窗口就是开始时刻本身；它作为 after 不应把下一轮推更远
+  const over = windowEnd(dot, runAt)
+  expect(over.getTime()).toBe(at(20, 0).getTime())
+  const next = computeNextRunAt(dot, runAt, over)
+  expect(next.getTime()).toBeGreaterThanOrEqual(over.getTime())
+  expect(next.getTime()).toBe(new Date(2026, 9, 4, 20, 0).getTime())
 })
 
 test("结果始终晚于当前时间", () => {
