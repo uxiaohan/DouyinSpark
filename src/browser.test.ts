@@ -38,7 +38,7 @@ test.skipIf(!process.env.PLAYWRIGHT)("launches and evades webdriver", async () =
   const { context, page } = await openAccountPage(account)
   await page.goto("https://example.com")
   expect(await page.title()).toContain("Example")
-  const wd = await page.evaluate(() => navigator.webdriver)
+  const wd = await page.evaluate(() => (navigator as unknown as { webdriver?: boolean }).webdriver)
   expect(wd).toBeFalsy()
   await closeAllBrowsers()
   expect(context.pages().length).toBeGreaterThanOrEqual(0)

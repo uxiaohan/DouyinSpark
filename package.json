@@ -9,6 +9,7 @@
     "seed": "bun run src/seed.ts",
     "calibrate": "bun run src/calibrate.ts",
     "build:web": "bun run --cwd web build",
+    "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
   "dependencies": {
