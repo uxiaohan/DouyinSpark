@@ -1,45 +1,39 @@
 /**
  * 抖音选择器集中在此，DOM 漂移时用 `bun run calibrate` 观察真实结构后回填。
- * 每个字段给出多个候选，按顺序取第一个可见项；全部失败即降级为 failed/skipped。
+ * 已在本机用真实 cookie 校准过一轮（2026-10-03，已登录状态）：
+ *   - 消息面板是弹层，点「消息」入口后 URL 不变，不能靠路由判断；
+ *   - 稳定把手是 data-e2e 属性（im-entry / conversation-item / msg-input），
+ *     css-module 混淆类名（conversationConversationItemwrapper 之类）每次构建都会变，只作兜底。
  */
 export const SEL = {
   homeUrl: "https://www.douyin.com/",
 
-  /** 顶部「消息」入口，按文案匹配 */
-  messageEntryText: ["消息", "私信"],
-
-  /** 未登录时可见的登录文案 */
-  loginText: ["立即登录", "登录"],
-
-  /** 会话列表容器 */
-  conversationList: [
-    "[data-e2e='message-list']",
-    "[class*='message-list']",
-    "[class*='conversation-list']",
-    "div[class*='chat']",
+  /** 左侧「消息」入口，点开 IM 弹层 */
+  imEntry: [
+    "[data-e2e='im-entry']",
   ],
 
-  /** 会话列表中的单条会话 */
+  /** 顶部「消息」入口的文案兜底（按文本匹配） */
+  messageEntryText: ["消息", "私信"],
+
+  /** 未登录时可见的登录按钮/链接文案 */
+  loginText: ["立即登录", "登录"],
+
+  /** 会话列表中的单条会话（已校准：data-e2e=conversation-item） */
   conversationItem: [
-    "[data-e2e='message-item']",
-    "[class*='message-item']",
+    "[data-e2e='conversation-item']",
+    "[class*='ConversationItem']",
     "[class*='conversation-item']",
     "[class*='chat-item']",
   ],
 
-  /** 消息输入框 */
+  /** 消息输入框：必须限定在消息输入容器里，否则会命中搜索框 */
   messageInput: [
-    "[data-e2e='message-input']",
+    "[data-e2e='msg-input'] [contenteditable='true']",
+    "[data-e2e='msg-input'] [data-slate-editor='true']",
     "[contenteditable='true']",
     "textarea[class*='input']",
     "div[class*='editor']",
-  ],
-
-  /** 发送按钮 */
-  sendButton: [
-    "[data-e2e='message-send']",
-    "button:has-text('发送')",
-    "[class*='send']:not([class*='sender'])",
   ],
 
   /**
@@ -50,6 +44,7 @@ export const SEL = {
    * 2. 不能收「请稍后再试」这类日常客套：检测扫的是整页 body 文本，含聊天记录，
    *    命中会把好友记成 failed 并可能连续失败中止整批，代价远大于漏判
    *    （漏判只会在发送时报错，同样有重试兜底）。
+   * 发送只用回车（抖音网页版不可切换），所以这里没有发送按钮选择器。
    */
   captchaText: [
     "请完成验证",

@@ -12,7 +12,6 @@ const s = reactive<Settings>({
   gapBetweenFriendsMs: [5000, 10000],
   gapBetweenAccountsMs: [30000, 90000],
   typingCps: [8, 16],
-  sendKey: 'Auto',
   maxScrollAttempts: 10,
   dryRun: true,
   pushdeerKey: '',
@@ -67,9 +66,7 @@ async function testNotify() {
       <div class="row">
         <label>每好友条数 <input v-model.number="s.perFriendMessages[0]" type="number" min="1" /> ~ <input v-model.number="s.perFriendMessages[1]" type="number" min="1" /></label>
         <label>打字速度 cps <input v-model.number="s.typingCps[0]" type="number" min="1" /> ~ <input v-model.number="s.typingCps[1]" type="number" min="1" /></label>
-        <label>发送方式
-          <select v-model="s.sendKey"><option>Auto</option><option>Enter</option><option>Click</option></select>
-        </label>
+        <label>发送方式 回车（抖音网页版不可切换）</label>
       </div>
       <div class="row">
         <label>消息间隔 ms <input v-model.number="s.gapBetweenMessagesMs[0]" type="number" min="0" /> ~ <input v-model.number="s.gapBetweenMessagesMs[1]" type="number" min="0" /></label>

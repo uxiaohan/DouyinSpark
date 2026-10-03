@@ -144,7 +144,7 @@ async function driveFriend(
     const now = await detectBlocked(page)
     if (now) return { status: sent > 0 ? "success" : "failed", messages: sent, reason: `风控: ${now}` }
     await typeMessage(page, text, s.typingCps)
-    await sendCurrentDraft(page, s.sendKey)
+    await sendCurrentDraft(page)
     sent += 1
     await sleep(randMs(s.gapBetweenMessagesMs))
   }

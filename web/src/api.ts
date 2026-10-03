@@ -10,7 +10,6 @@ export type Settings = {
   gapBetweenFriendsMs: [number, number]
   gapBetweenAccountsMs: [number, number]
   typingCps: [number, number]
-  sendKey: 'Enter' | 'Click' | 'Auto'
   maxScrollAttempts: number
   dryRun: boolean
   pushdeerKey: string | null

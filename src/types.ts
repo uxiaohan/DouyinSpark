@@ -2,7 +2,6 @@
 export type Bool = 0 | 1
 export type RunStatus = "success" | "partial" | "aborted"
 export type ItemStatus = "success" | "failed" | "skipped"
-export type SendKey = "Enter" | "Click" | "Auto"
 
 export type AccountRow = {
   id: number
@@ -74,7 +73,6 @@ export type RuntimeSettings = {
   gapBetweenFriendsMs: [number, number]
   gapBetweenAccountsMs: [number, number]
   typingCps: [number, number]
-  sendKey: SendKey
   maxScrollAttempts: number
   dryRun: boolean
   pushdeerKey: string | null

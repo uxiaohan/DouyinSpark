@@ -1,5 +1,5 @@
 import { getSetting, listAccounts, listFriends, listMessages, setSetting } from "./repo"
-import type { AccountRuntime, RunConfig, RuntimeSettings, SendKey } from "./types"
+import type { AccountRuntime, RunConfig, RuntimeSettings } from "./types"
 
 export type PlaywrightCookie = {
   name: string
@@ -22,7 +22,6 @@ export const DEFAULT_SETTINGS: RuntimeSettings = {
   gapBetweenFriendsMs: [5000, 10000],
   gapBetweenAccountsMs: [30000, 90000],
   typingCps: [8, 16],
-  sendKey: "Auto",
   maxScrollAttempts: 10,
   dryRun: true,
   pushdeerKey: null,
@@ -79,7 +78,6 @@ function readClock(v: unknown, min: number, max: number, def: number): number {
 
 export function loadSettings(): RuntimeSettings {
   const d = DEFAULT_SETTINGS
-  const sendKey = readJSON("sendKey")
   const sched = (readJSON("schedule") ?? {}) as Record<string, unknown>
   const limits = (readJSON("limits") ?? {}) as Partial<RuntimeSettings["limits"]>
   const limitsNum = (key: keyof RuntimeSettings["limits"], fallback: number): number =>
@@ -99,7 +97,6 @@ export function loadSettings(): RuntimeSettings {
     gapBetweenFriendsMs: readPair("gapBetweenFriendsMs", d.gapBetweenFriendsMs),
     gapBetweenAccountsMs: readPair("gapBetweenAccountsMs", d.gapBetweenAccountsMs),
     typingCps: readPair("typingCps", d.typingCps),
-    sendKey: sendKey === "Enter" || sendKey === "Click" || sendKey === "Auto" ? (sendKey as SendKey) : "Auto",
     maxScrollAttempts: readNumber("maxScrollAttempts", d.maxScrollAttempts),
     dryRun: readBool("dryRun", d.dryRun),
     pushdeerKey: readNullableString("pushdeerKey"),
@@ -123,7 +120,6 @@ export function saveSettings(s: RuntimeSettings): void {
   setSetting("gapBetweenFriendsMs", s.gapBetweenFriendsMs)
   setSetting("gapBetweenAccountsMs", s.gapBetweenAccountsMs)
   setSetting("typingCps", s.typingCps)
-  setSetting("sendKey", s.sendKey)
   setSetting("maxScrollAttempts", s.maxScrollAttempts)
   setSetting("dryRun", s.dryRun)
   setSetting("pushdeerKey", s.pushdeerKey)

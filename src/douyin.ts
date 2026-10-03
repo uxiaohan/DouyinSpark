@@ -1,7 +1,6 @@
 ﻿import type { Locator, Page } from "playwright"
 import { log } from "./logger"
 import { SEL } from "./selectors"
-import type { SendKey } from "./types"
 import { randInt, sleep } from "./util"
 
 /** 会话项首行即备注/昵称，精确匹配 */
@@ -41,11 +40,29 @@ async function textVisible(page: Page, re: RegExp, timeout = 2000): Promise<bool
   }
 }
 
+/**
+ * 登录按钮/链接是否可见。
+ * 用 role 而不是全文本文案：已登录首页上「登录」文案仍有 1 处命中（隐藏节点），
+ * 但可见按钮里没有它；未登录页则有名为「登录」的按钮。按 role 取可见项才不会误判。
+ */
+async function loginEntryVisible(page: Page, timeout = 1500): Promise<boolean> {
+  const re = new RegExp(SEL.loginText.join("|"))
+  for (const role of ["button", "link"] as const) {
+    try {
+      await page.getByRole(role, { name: re }).first().waitFor({ state: "visible", timeout })
+      return true
+    } catch {
+      /* 试下一个 role */
+    }
+  }
+  return false
+}
+
 export async function ensureLoggedIn(page: Page): Promise<boolean> {
   await page.goto(SEL.homeUrl, { waitUntil: "domcontentloaded" })
   await sleep(1000)
   if (page.url().includes("login")) return false
-  return !(await textVisible(page, new RegExp(SEL.loginText.join("|"))))
+  return !(await loginEntryVisible(page))
 }
 
 export async function detectBlocked(page: Page): Promise<string | null> {
@@ -60,13 +77,14 @@ export async function detectBlocked(page: Page): Promise<string | null> {
 }
 
 /**
- * 方案 A：在会话列表中按备注精确匹配点击进入；找不到则滚动 maxScroll 次后放弃。
+ * 方案 A：先点开 IM 弹层，再按备注精确匹配点击会话；找不到则滚动 maxScroll 次后放弃。
  * 抖音列表是虚拟滚动，条数不变但内容会变，因此以可见文案签名判断是否已到列表末尾。
+ * 弹层是否打开用"有会话项"判断——消息面板不换路由，URL 永远是首页。
  */
 export async function openConversation(page: Page, friendName: string, maxScroll: number): Promise<boolean> {
-  let list = await firstVisible(page, SEL.conversationList)
-  if (!list) {
-    const entry = page.getByText(new RegExp(SEL.messageEntryText.join("|"))).first()
+  let anchor = await firstVisible(page, SEL.conversationItem)
+  if (!anchor) {
+    const entry = (await firstVisible(page, SEL.imEntry)) ?? page.getByText(new RegExp(SEL.messageEntryText.join("|"))).first()
     try {
       await entry.click({ timeout: 5000 })
       await sleep(1500)
@@ -74,9 +92,9 @@ export async function openConversation(page: Page, friendName: string, maxScroll
       log.warn("点击「消息」入口失败", { friend: friendName, err: String(err) })
       return false
     }
-    list = await firstVisible(page, SEL.conversationList)
+    anchor = await firstVisible(page, SEL.conversationItem)
   }
-  if (!list) {
+  if (!anchor) {
     log.warn("未找到会话列表容器", { friend: friendName })
     return false
   }
@@ -102,7 +120,7 @@ export async function openConversation(page: Page, friendName: string, maxScroll
       return false
     }
     prevSig = sig
-    await list.hover().catch(() => undefined)
+    await anchor.hover().catch(() => undefined)
     await page.mouse.wheel(0, 800)
     await sleep(600)
   }
@@ -129,17 +147,11 @@ export async function typeMessage(page: Page, text: string, typingCps: [number, 
   }
 }
 
-export async function sendCurrentDraft(page: Page, sendKey: SendKey): Promise<void> {
-  if (sendKey === "Enter") {
-    await page.keyboard.press("Enter")
-    return
-  }
-  const btn = await firstVisible(page, SEL.sendButton)
-  if (btn) {
-    await btn.click({ timeout: 5000 })
-    return
-  }
-  if (sendKey === "Click") throw new Error("未找到发送按钮")
+/**
+ * 发送：抖音网页版 IM 只能用回车发送（设置里不可切换），
+ * 所以不找发送按钮——按钮是 svg、无 aria-label，点了反而多一层不稳定。
+ */
+export async function sendCurrentDraft(page: Page): Promise<void> {
   await page.keyboard.press("Enter")
 }
 
