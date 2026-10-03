@@ -5,6 +5,7 @@ import {
   createFriend,
   createMessage,
   deleteAccount,
+  findFriendByName,
   deleteFriend,
   deleteMessage,
   deleteSession,
@@ -193,8 +194,13 @@ export function createApp(): Hono {
     const body = (await c.req.json().catch(() => null)) as { name?: string } | null
     const name = body?.name
     if (typeof name !== "string" || name.trim().length === 0) return c.json({ error: "备注不能为空" }, 400)
+    const accountId = Number(c.req.param("id"))
+    // 同账号下重名直接拒：跑批会命中同一个会话，等于给同一个人发两条。
+    // 折叠空白后比较，所以 NBSP/全角空格和普通空格算同一个名字；不同账号可以有同名好友。
+    const dup = findFriendByName(accountId, name)
+    if (dup) return c.json({ error: `该账号下已有同名好友「${dup.name}」` }, 409)
     // 规范化（折叠空白）统一在 repo.createFriend 里做，这里只管校验
-    const id = createFriend(Number(c.req.param("id")), name)
+    const id = createFriend(accountId, name)
     return c.json({ ok: true, id })
   })
 

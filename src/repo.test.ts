@@ -14,6 +14,7 @@ const {
   listRunItems,
   listRuns,
   listFriends,
+  findFriendByName,
   countTodaySuccess,
   saveSession,
   getSession,
@@ -100,4 +101,17 @@ test("updateFriend 同样折叠空白", () => {
   const fid = createFriend(id, "旧名")
   updateFriend(fid, { name: "新\u00A0名" })
   expect(listFriends(id).map((f) => f.name)).toEqual(["新 名"])
+})
+
+// 添加好友查重用：折叠空白后比较——从抖音复制来的 NBSP 和手打的普通空格必须算
+// 同一个好友，否则查重形同虚设；不同账号可以有同名好友（各是各的抖音号）。
+test("findFriendByName 折叠空白后按账号查重", () => {
+  const a = createAccount({ alias: "a" })
+  const b = createAccount({ alias: "b" })
+  const fid = createFriend(a, "小明 阿花")
+  expect(findFriendByName(a, "小明\u00A0阿花")?.id).toBe(fid)
+  expect(findFriendByName(a, "  小明   阿花  ")?.id).toBe(fid)
+  expect(findFriendByName(a, "别人")).toBeNull()
+  createFriend(b, "小明 阿花")
+  expect(findFriendByName(b, "小明 阿花")?.id).not.toBe(fid)
 })

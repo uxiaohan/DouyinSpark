@@ -100,6 +100,14 @@ export function deleteAccount(id: number): void {
   db.query("DELETE FROM accounts WHERE id = ?").run(id)
 }
 
+/** 按账号 + 折叠空白后的名字查好友；添加好友时查重用 */
+export function findFriendByName(accountId: number, name: string): FriendRow | null {
+  const rows = db
+    .query("SELECT * FROM friends WHERE account_id = ? ORDER BY id")
+    .all(accountId) as FriendRow[]
+  return rows.find((r) => foldSpace(r.name) === foldSpace(name)) ?? null
+}
+
 export function touchAccountRun(id: number): void {
   db.query("UPDATE accounts SET last_run_at = ? WHERE id = ?").run(nowISO(), id)
 }
