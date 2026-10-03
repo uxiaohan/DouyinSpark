@@ -1,33 +1,26 @@
 ﻿import type { Locator, Page } from "playwright"
 import { log } from "./logger"
 import { SEL } from "./selectors"
-import { randInt, sleep } from "./util"
+import { foldSpace, randInt, sleep } from "./util"
 
 /**
- * 空白归一：JS 的 \s 已含不换行空格 U+00A0、全角空格 U+3000 等，
- * 统一折叠成单个普通空格。
- * 为什么必须做：实测抖音在昵称里渲染的是 U+00A0（字符码 160），而控制台里
- * 粘贴/输入的是普通空格（字符码 32）。不比这一下，每个好友都匹配不上，
- * 整批只会得到"未找到会话"——工具等于完全不能用。
- */
-function normSpace(s: string): string {
-  return s.replace(/\s+/g, " ").trim()
-}
-
-/**
- * 会话项首行即备注/昵称，精确匹配（空白归一后）。
+ * 会话项首行即备注/昵称，精确匹配（空白折叠后）。
+ * 为什么折叠：实测抖音在昵称里渲染的是 U+00A0（字符码 160），而控制台里
+ * 粘贴/输入的是普通空格（码 32）。不比这一下，每个好友都匹配不上，整批只会
+ * 得到"未找到会话"——工具等于完全不能用。折叠只统一空白的形态，不改变精确
+ * 匹配的性质："张 三"仍不等于"张三"，空格的有无是名字的一部分。
  * text 允许 undefined：抖音会话列表是虚拟滚动，`allInnerTexts()`（底层 $$eval）
  * 在列表重渲染时会对已脱离文档的节点返回 undefined。宁可不匹配，不能抛。
  */
 export function matchName(text: string | undefined, name: string): boolean {
   if (typeof text !== "string") return false
-  const first = normSpace(
+  const first = foldSpace(
     text
       .split("\n")
       .map((s) => s.trim())
       .find((s) => s.length > 0) ?? "",
   )
-  return first === normSpace(name)
+  return first === foldSpace(name)
 }
 
 export function findConversationIndex(texts: Array<string | undefined>, name: string): number {

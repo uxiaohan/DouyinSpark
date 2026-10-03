@@ -193,7 +193,8 @@ export function createApp(): Hono {
     const body = (await c.req.json().catch(() => null)) as { name?: string } | null
     const name = body?.name
     if (typeof name !== "string" || name.trim().length === 0) return c.json({ error: "备注不能为空" }, 400)
-    const id = createFriend(Number(c.req.param("id")), name.trim())
+    // 规范化（折叠空白）统一在 repo.createFriend 里做，这里只管校验
+    const id = createFriend(Number(c.req.param("id")), name)
     return c.json({ ok: true, id })
   })
 

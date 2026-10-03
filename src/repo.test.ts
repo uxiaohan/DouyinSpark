@@ -19,6 +19,7 @@ const {
   getSession,
   deleteSession,
   touchAccountRun,
+  updateFriend,
 } = repo
 
 beforeEach(reset)
@@ -82,4 +83,21 @@ test("session 存取与删除", () => {
   expect(getSession("tok-1")?.token).toBe("tok-1")
   deleteSession("tok-1")
   expect(getSession("tok-1")).toBeNull()
+})
+
+// 回归：从抖音复制来的昵称带着 NBSP（U+00A0，页面渲染用的就是它，实测码 160）
+// 或全角空格，原来入库只 trim()，原样存进去——控制台看着是普通空格，字符码却不是。
+// 库里只存人打得出来的形态；页面那边的形态由 douyin.ts 匹配时归一兜住，两边各管一边。
+test("createFriend 入库前把空白折叠成普通空格", () => {
+  const id = createAccount({ alias: "a" })
+  createFriend(id, "小明\u00A0阿花")
+  createFriend(id, "  全角\u3000空格  ")
+  expect(listFriends(id).map((f) => f.name)).toEqual(["小明 阿花", "全角 空格"])
+})
+
+test("updateFriend 同样折叠空白", () => {
+  const id = createAccount({ alias: "a" })
+  const fid = createFriend(id, "旧名")
+  updateFriend(fid, { name: "新\u00A0名" })
+  expect(listFriends(id).map((f) => f.name)).toEqual(["新 名"])
 })

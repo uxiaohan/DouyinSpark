@@ -1,4 +1,5 @@
 import { db, nowISO } from "./db"
+import { foldSpace } from "./util"
 import type {
   AccountRow,
   Bool,
@@ -116,13 +117,13 @@ export function createFriend(accountId: number, name: string): number {
   return Number(
     db
       .query("INSERT INTO friends (account_id, name, created_at) VALUES (?, ?, ?)")
-      .run(accountId, name, nowISO()).lastInsertRowid,
+      .run(accountId, foldSpace(name), nowISO()).lastInsertRowid,
   )
 }
 
 export function updateFriend(id: number, patch: { name?: string }): void {
   if (patch.name === undefined) return
-  db.query("UPDATE friends SET name = ? WHERE id = ?").run(patch.name, id)
+  db.query("UPDATE friends SET name = ? WHERE id = ?").run(foldSpace(patch.name), id)
 }
 
 export function deleteFriend(id: number): void {
