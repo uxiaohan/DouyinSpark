@@ -122,14 +122,13 @@ export function summarize(
  * 给一个好友挑本轮要发的文案。
  *
  * 池子的归属规则（用户口径）：**账号有专属文案就不碰全局**——专属是这个
- * 账号的，全局只服务没有专属的账号。所以专属非空时全局直接不参与，
- * 专属不够就少发几条，绝不拿全局垫数。
+ * 账号的，全局只服务没有专属的账号。专属非空时只用专属池，专属不够就
+ * 少发几条，绝不用全局垫数。
  *
- * used 是本轮跑批里**前面好友已经挑走**的文案：同账户多好友不发同一条
- * （用户实测两个好友收到同一文案）。专属池被前面好友轮空时返回空，
- * 由调用方跳过这个好友——宁可今晚不发，也不对两个人说同一句话、
- * 也不把公共文案发给有专属的账号。
- * 只有全局池才允许重复补足：全局池轮空时没得发比重复更糟。
+ * used 是本轮跑批里**前面好友已经挑走**的文案：同账户多好友优先发不同
+ * 的（用户实测两个好友收到同一文案）。专属池被轮空时，还在专属池里随机
+ * 抽（用户 21:44 口径：宁可对两个人说同一句专属，也不跳过、也不落全局）。
+ * 只有落到全局池时，轮空同样随机补足——没得发比重复更糟。
  */
 export function pickFriendTexts(
   messages: readonly string[],
@@ -145,8 +144,9 @@ export function pickFriendTexts(
     n,
     dedupe,
   )
-  if (picked.length >= n || messages.length > 0) return picked
-  // 走到这里只在用全局池：轮空了允许重复补足
+  if (picked.length >= n) return picked
+  // 池子被前面好友轮空：在本池内随机补足（可能和别的好友重复），
+  // 但绝不去另一个池——池的归属是硬规则
   const more = sampleN(
     pool.filter((t) => !picked.includes(t)),
     n - picked.length,
@@ -180,12 +180,8 @@ async function driveFriend(
   log.info("挑选本轮文案", { friend: friend.name, own: pool.length, fallback: fallback.length, texts })
   if (s.dryRun) return { status: "skipped", messages: 0, reason: "dry-run 未发送" }
   if (left <= 0) return { status: "skipped", messages: 0, reason: "已达当日上限" }
-  if (texts.length === 0) {
-    // 有专属但被本轮前面好友轮空：明确记下来，用户看一眼就知道该加专属文案了，
-    // 而不是莫名其妙"无可用文案"
-    const reason = pool.length > 0 ? "专属文案已轮空（不使用全局）" : "无可用文案"
-    return { status: "skipped", messages: 0, reason }
-  }
+  // 只有"这个账号一条文案都没有"才会走到这里：专属空→走全局，全局也空
+  if (texts.length === 0) return { status: "skipped", messages: 0, reason: "无可用文案" }
 
   let sent = 0
   for (const text of texts) {
