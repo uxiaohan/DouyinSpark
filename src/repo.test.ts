@@ -10,6 +10,7 @@ const {
   deleteAccount,
   createRun,
   finishRun,
+  reapStaleRuns,
   addRunItem,
   listRunItems,
   listRuns,
@@ -64,6 +65,19 @@ test("finishRun 落库状态与汇总", () => {
   expect(runs[0]!.status).toBe("success")
   expect(runs[0]!.finished_at).not.toBeNull()
   expect(listRunItems(runId).length).toBe(1)
+})
+
+// 回归：进程被硬杀/崩溃时 finishRun 来不及跑，runs 里留下永远"进行中"的行，
+// 界面里阴魂不散（2026-10-04 仪表盘"最近跑批"显示的僵尸 run 31）。启动时收尾。
+test("reapStaleRuns 把残留的 running 行收尾为 aborted 并写结束时间", () => {
+  const runId = createRun("schedule")
+  expect(listRuns(1)[0]!.status).toBe("running")
+  expect(reapStaleRuns()).toBe(1)
+  const row = listRuns(1)[0]!
+  expect(row.status).toBe("aborted")
+  expect(row.finished_at).not.toBeNull()
+  // 已收尾的行不会被二次处理
+  expect(reapStaleRuns()).toBe(0)
 })
 
 test("listAccounts(onlyEnabled) 过滤禁用账号", () => {

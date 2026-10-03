@@ -35,6 +35,7 @@ function runStatusLabel(status: string) {
   if (status === 'partial') return '部分失败'
   if (status === 'failed') return '失败'
   if (status === 'running') return '进行中'
+  if (status === 'aborted') return '已中止'
   return status
 }
 

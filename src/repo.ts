@@ -166,6 +166,18 @@ export function createRun(trigger: string): number {
   )
 }
 
+/**
+ * 启动时收尾上次残留的 running 行：进程被硬杀/崩溃时 finishRun 来不及跑，
+ * 那一行会永远停在"进行中"，界面里阴魂不散。进程刚启动，没有别人的跑批在跑，
+ * 所有 running 行只可能是上代的尸体。返回收尾行数。
+ */
+export function reapStaleRuns(): number {
+  const r = db
+    .query("UPDATE runs SET status = 'aborted', finished_at = ?, summary_json = ? WHERE status = 'running'")
+    .run(nowISO(), JSON.stringify({ interrupted: true }))
+  return Number(r.changes)
+}
+
 export function finishRun(id: number, status: RunStatus, summary: unknown): void {
   db.query("UPDATE runs SET finished_at = ?, status = ?, summary_json = ? WHERE id = ?").run(
     nowISO(),
