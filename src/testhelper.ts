@@ -1,6 +1,7 @@
 /**
- * 测试用库：Bun 在同一进程内跨测试文件共享模块缓存，逐文件设置 DB_PATH 不生效，
- * 因此统一使用一个 :memory: 库，由 reset() 在用例之间清表。
+ * 测试用库。通过 bunfig.toml 的 [test].preload 在任何测试文件之前加载，
+ * 把 DB_PATH 固定为 :memory:；否则先加载的测试文件会按默认路径打开真实的 data/app.db，
+ * 并被 reset() 清空真实数据。
  * 导入本文件后不要再静态 import ./db、./repo、./config。
  */
 process.env.DB_PATH = ":memory:"
