@@ -88,11 +88,54 @@ export async function detectBlocked(page: Page): Promise<string | null> {
 }
 
 /**
+ * 收尾：重置上一个好友留下的聊天弹层。
+ *
+ * 实测（2026-10-03 探针 + 真机 run 18/20，已登录态）：
+ * - 点开会话后 `[data-stack-layer='chat']` 盖住整个 IM 面板：会话项 locator 仍能
+ *   解析到、元素可见，但点击被 "subtree intercepts pointer events" 挡死。多好友
+ *   连续跑时，第二个好友起全部记成"未找到会话"，真因是点击被拦（run 18 复现）；
+ * - Escape 关不掉这层；直接重开「消息」入口也关不掉；
+ * - 点 im-entry 能把 IM 面板收起，但紧接着重开入口会把面板恢复成聊天态——
+ *   第二个好友的点击照样被拦（run 20 复现），所以收起/重开这套不做；
+ * - reload 能把所有 stack layer 清掉，之后 openConversation 的既有兜底重新点开
+ *   「消息」入口即可看到可点的会话列表（探针验证），是唯一走到确定状态的路径。
+ */
+export async function closeChatLayer(page: Page): Promise<void> {
+  if (!(await chatLayerVisible(page))) return
+  // reload 失败不抛：最坏退回旧行为（这个好友未找到会话），不拖垮整批
+  await page.reload({ waitUntil: "domcontentloaded" }).catch(() => undefined)
+}
+
+/**
+ * 聊天弹层当前是否可见。这层在 DOM 里常驻，关闭时只是 display:none，
+ * 所以必须看计算样式，不能只问"元素在不在"。
+ * 回调在浏览器里执行，但本 tsconfig 不含 DOM lib，DOM 全局量统一经 globalThis 取；
+ * 选择器必须经 arg 传进去——evaluate 只序列化函数体，闭包里的自由变量（SEL）
+ * 在页面上下文不存在，直接在函数体引用会 ReferenceError（实测踩过）。
+ */
+async function chatLayerVisible(page: Page): Promise<boolean> {
+  const sel = SEL.chatLayer.join(", ")
+  return page.evaluate((s: string) => {
+    const g = globalThis as unknown as {
+      document: { querySelector: (sel: string) => { getBoundingClientRect: () => { width: number; height: number } } | null }
+      getComputedStyle: (el: unknown) => { visibility: string; display: string }
+    }
+    const chat = g.document.querySelector(s)
+    if (!chat) return false
+    const r = chat.getBoundingClientRect()
+    const style = g.getComputedStyle(chat)
+    return r.width > 0 && r.height > 0 && style.visibility !== "hidden" && style.display !== "none"
+  }, sel)
+}
+
+/**
  * 方案 A：先点开 IM 弹层，再按备注精确匹配点击会话；找不到则滚动 maxScroll 次后放弃。
  * 抖音列表是虚拟滚动，条数不变但内容会变，因此以可见文案签名判断是否已到列表末尾。
  * 弹层是否打开用"有会话项"判断——消息面板不换路由，URL 永远是首页。
  */
 export async function openConversation(page: Page, friendName: string, maxScroll: number): Promise<boolean> {
+  // 上一个好友的聊天弹层会盖住整个面板，不先收起来，这个好友的会话项一个也点不动
+  await closeChatLayer(page)
   let anchor = await firstVisible(page, SEL.conversationItem)
   if (!anchor) {
     const entry = (await firstVisible(page, SEL.imEntry)) ?? page.getByText(new RegExp(SEL.messageEntryText.join("|"))).first()

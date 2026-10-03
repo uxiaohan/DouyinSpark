@@ -27,6 +27,12 @@ export const SEL = {
     "[class*='chat-item']",
   ],
 
+  /**
+   * 聊天弹层：点开会话后盖住整个 IM 面板的那层（实测点击被它拦截）。
+   * 该层在 DOM 里常驻，收起时只是 display:none，判断"是否开着"必须看计算样式。
+   */
+  chatLayer: ["[data-stack-layer='chat']"],
+
   /** 消息输入框：必须限定在消息输入容器里，否则会命中搜索框 */
   messageInput: [
     "[data-e2e='msg-input'] [contenteditable='true']",

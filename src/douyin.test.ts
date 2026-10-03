@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test"
 import type { Page } from "playwright"
-import { ensureLoggedIn, findConversationIndex, matchName } from "./douyin"
+import { closeChatLayer, ensureLoggedIn, findConversationIndex, matchName } from "./douyin"
 
 /** 最小 Page 假件：只实现 ensureLoggedIn 用到的 goto/url/getByRole */
 function fakePage(opts: { url: string; roleNames: string[] }): Page {
@@ -80,4 +80,42 @@ test("空白归一不放松精确匹配：空格有无仍是两个名字", () =>
   expect(matchName("张 三", "张三")).toBe(false)
   expect(matchName("张三", "张 三")).toBe(false)
   expect(matchName("灵匠 宋泽", "灵匠 宋泽浩")).toBe(false)
+})
+
+/**
+ * 最小 Page 假件：驱动 closeChatLayer 的决策分支。
+ * 注意：假件的 evaluate 不真在页面里跑回调，所以"闭包自由变量在页面上下文
+ * 不存在"这类问题（run 19 真机踩过：SEL is not defined）单元测试拦不住，
+ * 只能靠真机跑批验证。这里覆盖的是 reload 兜底/失败不抛/空转三条路径。
+ */
+function fakeChatPage(opts: { chatVisible: boolean; reloadOk?: boolean }): { page: Page; stats: { reloads: number } } {
+  let visible = opts.chatVisible
+  const stats = { reloads: 0 }
+  const page = {
+    evaluate: async () => visible,
+    reload: async () => {
+      stats.reloads += 1
+      if (opts.reloadOk === false) throw new Error("reload failed")
+      visible = false
+    },
+  }
+  return { page: page as unknown as Page, stats }
+}
+
+test("有聊天弹层：reload 页面重置，不抛", async () => {
+  const { page, stats } = fakeChatPage({ chatVisible: true })
+  await closeChatLayer(page)
+  expect(stats.reloads).toBe(1)
+})
+
+test("reload 失败不抛：最坏退回旧行为，不拖垮整批", async () => {
+  const { page, stats } = fakeChatPage({ chatVisible: true, reloadOk: false })
+  await closeChatLayer(page)
+  expect(stats.reloads).toBe(1)
+})
+
+test("没有聊天弹层：不 reload，无谓刷新只会拖慢并增加风控面", async () => {
+  const { page, stats } = fakeChatPage({ chatVisible: false })
+  await closeChatLayer(page)
+  expect(stats.reloads).toBe(0)
 })
