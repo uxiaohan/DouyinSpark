@@ -1,5 +1,5 @@
 import type { RouterHistory } from 'vue-router'
-import { createMemoryHistory, createRouter, createWebHashHistory } from 'vue-router'
+import { createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
 import { isAuthenticated, probeSession } from '@/lib/session'
 import { routes } from './routes'
 
@@ -7,8 +7,9 @@ export function createAppRouter(
   history?: RouterHistory,
 ) {
   const router = createRouter({
-    // 控制台由后端静态托管 dist，hash 路由对 SPA fallback 最稳
-    history: history ?? (typeof window === 'undefined' ? createMemoryHistory() : createWebHashHistory()),
+    // history 模式：URL 不带 #。深链接（如 /settings）依赖 SPA fallback——
+    // 后端 web-server.ts 对 /* 兜底返回 index.html，dev 由 vite 兜底
+    history: history ?? (typeof window === 'undefined' ? createMemoryHistory() : createWebHistory()),
     routes,
   })
 

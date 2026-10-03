@@ -58,8 +58,9 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   })
   if (res.status === 401) {
-    // hash 路由下 pathname 永远是 /，改 path 会整页刷新；直接换 hash 让路由守卫接管
-    if (!location.hash.startsWith('#/login')) location.hash = '#/login'
+    // history 模式下 /login 是真实 URL：prod 由后端兜底 index.html，dev 由 vite 兜底，整页跳转即可
+    // 登录页本身不跳——错误口令同样是 401，跳了就是刷新死循环
+    if (location.pathname !== '/login') location.assign('/login')
     throw new Error('未登录')
   }
   if (!res.ok) {
