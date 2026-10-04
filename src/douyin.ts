@@ -373,10 +373,13 @@ export async function markSeenOutgoing(page: Page, text: string): Promise<void> 
   await page.evaluate(
     (arg: { outgoing: string; text: string; seen: string }) => {
       const g = globalThis as unknown as {
-        document: { querySelectorAll: (s: string) => unknown[] }
+        document: { querySelectorAll: (s: string) => Iterable<unknown> }
       }
       const norm = (s: string) => s.replace(/[\u200B-\u200F\uFEFF]+/g, "").replace(/\s+/g, "")
-      for (const el of g.document.querySelectorAll(arg.outgoing)) {
+      // Array.from：querySelectorAll 回来的是 NodeList，只有迭代协议、没有
+      // filter/map/some 这些数组方法（2026-10-04 真机首跑就炸在这：
+      // `querySelectorAll(...).filter is not a function`）
+      for (const el of Array.from(g.document.querySelectorAll(arg.outgoing))) {
         const e = el as { innerText?: string; setAttribute: (n: string, v: string) => void }
         if (norm(e.innerText ?? "").includes(norm(arg.text))) e.setAttribute(arg.seen, "1")
       }
@@ -400,7 +403,7 @@ export async function readBubbleState(page: Page, text: string): Promise<BubbleS
       pendingCss: readonly string[]
     }): BubbleState => {
       const g = globalThis as unknown as {
-        document: { querySelectorAll: (s: string) => unknown[] }
+        document: { querySelectorAll: (s: string) => Iterable<unknown> }
       }
       // 与 markSeenOutgoing 同一套归一，同样必须内联（页面上下文无模块作用域）
       const norm = (s: string) => s.replace(/[\u200B-\u200F\uFEFF]+/g, "").replace(/\s+/g, "")
@@ -409,7 +412,11 @@ export async function readBubbleState(page: Page, text: string): Promise<BubbleS
         querySelector: (s: string) => unknown
         innerText?: string
       }
-      const all = g.document.querySelectorAll(arg.outgoing) as El[]
+      // Array.from 是必须的：querySelectorAll 给的是 NodeList，没有 filter/map。
+      // 真机 2026-10-04 首跑三个好友全 failed 就是炸在这一行
+      // （`querySelectorAll(...).filter is not a function`），而单测的假件
+      // 返回的是真数组所以一直是绿的——别再把这里改回裸 querySelectorAll。
+      const all = Array.from(g.document.querySelectorAll(arg.outgoing)) as El[]
       const fresh = all
         .filter((el) => norm(el.innerText ?? "").includes(norm(arg.text)))
         .filter((el) => !el.hasAttribute(arg.seen))

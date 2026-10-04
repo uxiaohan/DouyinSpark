@@ -120,6 +120,25 @@ class FakeEl {
 type SearchRow = { title: string; hasBtn?: boolean; clickThrows?: boolean }
 
 /**
+ * NodeList 语义的查询结果：只有迭代协议和 item/length，**没有** filter/map/some。
+ * 2026-10-04 真机首跑三个好友全 failed，就是因为代码对 querySelectorAll 的
+ * 返回值直接 .filter，而浏览器给的是 NodeList；假件此前返回真数组所以单测全绿。
+ * 假件必须比真件严，否则就是给 bug 发通行证。
+ */
+class FakeNodeList {
+  constructor(private items: FakeEl[]) {}
+  get length(): number {
+    return this.items.length
+  }
+  item(i: number): FakeEl | null {
+    return this.items[i] ?? null
+  }
+  [Symbol.iterator](): Iterator<FakeEl> {
+    return this.items[Symbol.iterator]()
+  }
+}
+
+/**
  * 最小 Page 假件：只覆盖 douyin.ts 真正调到的 API。
  *
  * 两类等待（waitFor / 固定 sleep）都没有真实时长——这里验的是分支决策，
@@ -275,8 +294,11 @@ class FakePage {
     const g = globalThis as { document?: unknown }
     const prev = g.document
     g.document = {
+      // NodeList 语义，和浏览器一致：没有 filter/map/some
       querySelectorAll: (sel: string) =>
-        sel === SEL.outgoingBubble ? [...this.existingBubbles, ...(this.triggered ? this.newBubble() : [])] : [],
+        sel === SEL.outgoingBubble
+          ? new FakeNodeList([...this.existingBubbles, ...(this.triggered ? this.newBubble() : [])])
+          : new FakeNodeList([]),
     }
     try {
       return await fn(arg)
@@ -525,6 +547,20 @@ test("锚点只打在含目标文案的既有气泡上", async () => {
   await markSeenOutgoing(page.asPage(), "多喝热水")
   expect(other.hasAttribute(SEEN_ATTR)).toBe(false)
   expect(mine.hasAttribute(SEEN_ATTR)).toBe(true)
+})
+
+// 回归（2026-10-04 真机首跑，三个好友全 failed）：querySelectorAll 在浏览器里
+// 返回的是 NodeList，没有 filter/map/some。直接 .filter 会在 evaluate 里抛
+// TypeError，被 handleFriend 当成发送失败——而消息其实已经点发出去了，于是
+// 重试 2 次，每人白白多发两遍。NodeList 语义 + 这条用例钉住它。
+test("气泡查询结果按 NodeList 语义用：不许直接 filter/map/some", async () => {
+  const page = new FakePage()
+  page.existingBubbles = [new FakeEl(MESSAGE)]
+  // 这两行在浏览器里必须能跑通：Array.from(NodeList) 后才有数组方法
+  expect(await readBubbleState(page.asPage(), MESSAGE)).toBe("clean")
+  await markSeenOutgoing(page.asPage(), MESSAGE)
+  expect(page.existingBubbles[0]!.hasAttribute(SEEN_ATTR)).toBe(true)
+  expect(await readBubbleState(page.asPage(), MESSAGE)).toBe("missing")
 })
 
 test("零宽字符与换行不影响气泡文案匹配", async () => {
