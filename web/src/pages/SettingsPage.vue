@@ -18,10 +18,6 @@ const form = reactive({
   timezone: 'Asia/Shanghai',
   startTime: '20:06',
   endTime: '20:10',
-  perMin: 1,
-  perMax: 3,
-  messageGapMin: 60000,
-  messageGapMax: 180000,
   friendGapMin: 30000,
   friendGapMax: 90000,
   accountGapMin: 60000,
@@ -30,7 +26,6 @@ const form = reactive({
   typingCpsMax: 12,
   maxScrollAttempts: 3,
   shuffleFriends: true,
-  dedupeMessagesPerFriend: true,
   dailyCapPerAccount: 100,
   retryPerFriend: 1,
   consecutiveFailAbort: 3,
@@ -53,10 +48,7 @@ function toSettings(): Settings {
   return {
     timezone: form.timezone,
     schedule: { startHour: start.hour, startMinute: start.minute, endHour: end.hour, endMinute: end.minute },
-    perFriendMessages: [form.perMin, form.perMax],
-    dedupeMessagesPerFriend: form.dedupeMessagesPerFriend,
     shuffleFriends: form.shuffleFriends,
-    gapBetweenMessagesMs: [form.messageGapMin, form.messageGapMax],
     gapBetweenFriendsMs: [form.friendGapMin, form.friendGapMax],
     gapBetweenAccountsMs: [form.accountGapMin, form.accountGapMax],
     typingCps: [form.typingCpsMin, form.typingCpsMax],
@@ -72,10 +64,6 @@ function fromSettings(s: Settings) {
   form.timezone = s.timezone
   form.startTime = `${pad(s.schedule.startHour)}:${pad(s.schedule.startMinute)}`
   form.endTime = `${pad(s.schedule.endHour)}:${pad(s.schedule.endMinute)}`
-  form.perMin = s.perFriendMessages[0]
-  form.perMax = s.perFriendMessages[1]
-  form.messageGapMin = s.gapBetweenMessagesMs[0]
-  form.messageGapMax = s.gapBetweenMessagesMs[1]
   form.friendGapMin = s.gapBetweenFriendsMs[0]
   form.friendGapMax = s.gapBetweenFriendsMs[1]
   form.accountGapMin = s.gapBetweenAccountsMs[0]
@@ -84,7 +72,6 @@ function fromSettings(s: Settings) {
   form.typingCpsMax = s.typingCps[1]
   form.maxScrollAttempts = s.maxScrollAttempts
   form.shuffleFriends = s.shuffleFriends
-  form.dedupeMessagesPerFriend = s.dedupeMessagesPerFriend
   form.dailyCapPerAccount = s.limits.dailyCapPerAccount
   form.retryPerFriend = s.limits.retryPerFriend
   form.consecutiveFailAbort = s.limits.consecutiveFailAbort
@@ -169,21 +156,9 @@ onMounted(load)
 
     <section class="component-section">
       <div class="component-section-head">
-        <div><h2>发送节奏</h2><p>控制每条消息、每个好友、每个账号之间的间隔，模拟真人操作。</p></div>
+        <div><h2>发送节奏</h2><p>每个好友每次运行固定发送 1 条消息；此处控制好友之间、账号之间的间隔，模拟真人操作。</p></div>
       </div>
       <div class="component-body component-form-grid">
-        <label class="component-field">每好友最少消息
-          <input v-model.number="form.perMin" class="console-number" type="number" min="1" />
-        </label>
-        <label class="component-field">每好友最多消息
-          <input v-model.number="form.perMax" class="console-number" type="number" min="1" />
-        </label>
-        <label class="component-field">消息间隔下限（毫秒）
-          <input v-model.number="form.messageGapMin" class="console-number" type="number" min="0" step="1000" />
-        </label>
-        <label class="component-field">消息间隔上限（毫秒）
-          <input v-model.number="form.messageGapMax" class="console-number" type="number" min="0" step="1000" />
-        </label>
         <label class="component-field">好友间隔下限（毫秒）
           <input v-model.number="form.friendGapMin" class="console-number" type="number" min="0" step="1000" />
         </label>
@@ -207,16 +182,12 @@ onMounted(load)
 
     <section class="component-section">
       <div class="component-section-head">
-        <div><h2>挑选策略与限额</h2><p>专属优先、同好友去重、每日上限与失败中止阈值。</p></div>
+        <div><h2>挑选策略与限额</h2><p>专属优先全局兜底、跨好友去重文案、每日上限与失败中止阈值。</p></div>
       </div>
       <div class="component-body">
         <div class="component-control-row">
           <span>好友乱序（shuffleFriends）</span>
           <label class="console-switch"><input v-model="form.shuffleFriends" type="checkbox" /><i /></label>
-        </div>
-        <div class="component-control-row">
-          <span>同一好友内不重复文案（dedupeMessagesPerFriend）</span>
-          <label class="console-switch"><input v-model="form.dedupeMessagesPerFriend" type="checkbox" /><i /></label>
         </div>
         <div class="component-form-grid">
           <label class="component-field">单账号每日上限

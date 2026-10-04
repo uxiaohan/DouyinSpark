@@ -130,8 +130,8 @@ onMounted(async () => {
         <div class="channel-strip">
           <div>
             <span><i class="channel-dot strong" />每个好友发送</span>
-            <strong>{{ settings ? `${settings.perFriendMessages[0]} - ${settings.perFriendMessages[1]} 条` : '-' }}</strong>
-            <small>随机区间</small>
+            <strong>1 条</strong>
+            <small>固定条数</small>
           </div>
           <div>
             <span><i class="channel-dot" />好友乱序</span>
@@ -139,9 +139,9 @@ onMounted(async () => {
             <small>shuffleFriends</small>
           </div>
           <div>
-            <span><i class="channel-dot" />同好友去重</span>
-            <strong>{{ settings?.dedupeMessagesPerFriend ? '开启' : '关闭' }}</strong>
-            <small>dedupeMessagesPerFriend</small>
+            <span><i class="channel-dot" />重试上限</span>
+            <strong>{{ settings ? `${settings.limits.retryPerFriend} 次` : '-' }}</strong>
+            <small>retryPerFriend</small>
           </div>
         </div>
       </div>

@@ -15,10 +15,7 @@ export type PlaywrightCookie = {
 export const DEFAULT_SETTINGS: RuntimeSettings = {
   timezone: "Asia/Shanghai",
   schedule: { startHour: 8, startMinute: 0, endHour: 10, endMinute: 0 },
-  perFriendMessages: [1, 3],
-  dedupeMessagesPerFriend: true,
   shuffleFriends: true,
-  gapBetweenMessagesMs: [1500, 4000],
   gapBetweenFriendsMs: [5000, 10000],
   gapBetweenAccountsMs: [30000, 90000],
   typingCps: [8, 16],
@@ -105,10 +102,7 @@ export function loadSettings(): RuntimeSettings {
       endHour: readClock(sched.endHour, 0, 23, d.schedule.endHour),
       endMinute: readClock(sched.endMinute, 0, 59, d.schedule.endMinute),
     },
-    perFriendMessages: readPair("perFriendMessages", d.perFriendMessages),
-    dedupeMessagesPerFriend: readBool("dedupeMessagesPerFriend", d.dedupeMessagesPerFriend),
     shuffleFriends: readBool("shuffleFriends", d.shuffleFriends),
-    gapBetweenMessagesMs: readPair("gapBetweenMessagesMs", d.gapBetweenMessagesMs),
     gapBetweenFriendsMs: readPair("gapBetweenFriendsMs", d.gapBetweenFriendsMs),
     gapBetweenAccountsMs: readPair("gapBetweenAccountsMs", d.gapBetweenAccountsMs),
     typingCps: readPair("typingCps", d.typingCps),
@@ -127,10 +121,7 @@ export function loadSettings(): RuntimeSettings {
 export function saveSettings(s: RuntimeSettings): void {
   setSetting("timezone", s.timezone)
   setSetting("schedule", s.schedule)
-  setSetting("perFriendMessages", s.perFriendMessages)
-  setSetting("dedupeMessagesPerFriend", s.dedupeMessagesPerFriend)
   setSetting("shuffleFriends", s.shuffleFriends)
-  setSetting("gapBetweenMessagesMs", s.gapBetweenMessagesMs)
   setSetting("gapBetweenFriendsMs", s.gapBetweenFriendsMs)
   setSetting("gapBetweenAccountsMs", s.gapBetweenAccountsMs)
   setSetting("typingCps", s.typingCps)
@@ -148,7 +139,7 @@ export function loadRunConfig(): RunConfig {
     return {
       account,
       friends: listFriends(account.id),
-      // 专属与全局分开存：挑选时专属优先、全局兜底（见 pickFriendTexts），
+      // 专属与全局分开存：挑选时专属优先、全局兜底（见 pickFriendText），
       // 以前合成一个池随机抽，专属会被全局淹没
       messages: clean(listMessages(account.id)),
       fallbackMessages: clean(listMessages(null)),

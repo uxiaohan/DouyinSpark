@@ -3,7 +3,7 @@ import { test, expect, beforeEach } from "bun:test"
 import { DEFAULT_SETTINGS } from "./config"
 import type { AccountResult, AccountRuntime, FriendRow, RuntimeSettings } from "./types"
 import type { RunState } from "./runner"
-import { cookieExpiredResult, handleFriend, isRunning, persistAccountItems, pickFriendTexts, resetStop, summarize } from "./runner"
+import { cookieExpiredResult, handleFriend, isRunning, persistAccountItems, pickFriendText, resetStop, summarize } from "./runner"
 import { createRun, listRunItems } from "./repo"
 
 const friend = (id: number, name: string): FriendRow => ({ id, account_id: 1, name, created_at: "" })
@@ -95,18 +95,23 @@ test("cookie 失效 → 该账号全部好友 skipped 且 cookieExpired=true", (
 
 test("handleFriend 首次失败后重试成功 → success，不计连续失败", async () => {
   let calls = 0
-  const fr = await handleFriend(friend(1, "张三"), state(), async () => {
-    calls += 1
-    if (calls === 1) throw new Error("第一次失败")
-    return { status: "success" as const, messages: 2, reason: null }
-  })
+  const fr = await handleFriend(
+    friend(1, "张三"),
+    // 重试前的停顿走好友间隔，测试里置 0 免得等 5-10 秒
+    state({}, { ...DEFAULT_SETTINGS, gapBetweenFriendsMs: [0, 0] }),
+    async () => {
+      calls += 1
+      if (calls === 1) throw new Error("第一次失败")
+      return { status: "success" as const, messages: 1, reason: null }
+    },
+  )
   expect(fr.status).toBe("success")
   expect(calls).toBe(2)
-  expect(fr.messages).toBe(2)
+  expect(fr.messages).toBe(1)
 })
 
 test("handleFriend 重试用尽 → failed 且连续失败累加", async () => {
-  const s = state({}, { ...DEFAULT_SETTINGS, limits: { ...DEFAULT_SETTINGS.limits, retryPerFriend: 1, consecutiveFailAbort: 99 } })
+  const s = state({}, { ...DEFAULT_SETTINGS, gapBetweenFriendsMs: [0, 0], limits: { ...DEFAULT_SETTINGS.limits, retryPerFriend: 1, consecutiveFailAbort: 99 } })
   const fr = await handleFriend(friend(1, "张三"), s, async () => {
     throw new Error("一直失败")
   })
@@ -181,7 +186,7 @@ test("cookie 失效账号的好友明细也落 run_items（带原因）", () => 
 test("persistAccountItems 原样落账成功/失败/跳过各状态", () => {
   const runId = createRun("manual")
   persistAccountItems(runId, 7, [
-    { friendId: 1, name: "张三", status: "success", messages: 2, reason: null },
+    { friendId: 1, name: "张三", status: "success", messages: 1, reason: null },
     { friendId: 2, name: "李四", status: "failed", messages: 0, reason: "验证码" },
     { friendId: 3, name: "王五", status: "skipped", messages: 0, reason: "已达当日上限" },
   ])
@@ -190,7 +195,7 @@ test("persistAccountItems 原样落账成功/失败/跳过各状态", () => {
   expect(rows.map((r) => r.status)).toEqual(["success", "failed", "skipped"])
   expect(rows.every((r) => r.account_id === 7)).toBe(true)
   expect(rows[1]!.reason).toBe("验证码")
-  expect(rows[0]!.messages).toBe(2)
+  expect(rows[0]!.messages).toBe(1)
 })
 
 // 回归（用户真机 run 22）：专属与全局文案曾合成一个池随机抽，8 条池子里 1 条
@@ -198,37 +203,29 @@ test("persistAccountItems 原样落账成功/失败/跳过各状态", () => {
 // 用户后续口径收紧：账号有专属就不碰全局。以下用循环断言压住随机性。
 test("专属够用：只发账号专属文案", () => {
   for (let i = 0; i < 50; i++) {
-    const texts = pickFriendTexts(["专属甲", "专属乙"], ["全局一", "全局二"], 2, true)
-    expect(texts.sort()).toEqual(["专属乙", "专属甲"])
+    expect(pickFriendText(["专属甲", "专属乙"], ["全局一", "全局二"])).toEqual(
+      expect.stringMatching(/^专属[甲乙]$/),
+    )
   }
 })
 
-test("专属不够：只发专属，不用全局垫数", () => {
+// 用户 2026-10-05 口径：每个好友每轮只发 1 条，条数旋钮整个删掉
+// （过去 perFriendMessages [1,N] 随机 + retryPerFriend 重试，出现过
+// "设了 1 条却发了好几条"，真人好友被反复打扰）。
+test("每个好友每轮只挑 1 条：专属池也绝不因此多挑", () => {
   for (let i = 0; i < 50; i++) {
-    // count 远大于专属数，也绝不多发一条全局——宁可少发
-    const texts = pickFriendTexts(["专属甲"], ["全局一", "全局二"], 3, true)
-    expect(texts).toEqual(["专属甲"])
+    expect(pickFriendText(["专属甲"], ["全局一", "全局二"])).toBe("专属甲")
   }
 })
 
 test("没有专属文案：才用全局", () => {
-  const texts = pickFriendTexts([], ["全局一", "全局二"], 2, true)
-  expect(texts.sort()).toEqual(["全局一", "全局二"])
+  for (let i = 0; i < 50; i++) {
+    expect(pickFriendText([], ["全局一", "全局二"])).toEqual(expect.stringMatching(/^全局[一二]$/))
+  }
 })
 
-test("两个池都空：返回空（调用方据此跳过该好友）", () => {
-  expect(pickFriendTexts([], [], 2, true)).toEqual([])
-})
-
-test("同一个好友内同一条不重样（dedupe 开）", () => {
-  const texts = pickFriendTexts([], ["同一条", "同一条", "别的"], 2, true)
-  expect(texts.filter((t) => t === "同一条").length).toBe(1)
-  expect(texts.length).toBe(2)
-})
-
-test("count 为 0 或负数：不发", () => {
-  expect(pickFriendTexts(["专属甲"], ["全局一"], 0, true)).toEqual([])
-  expect(pickFriendTexts(["专属甲"], ["全局一"], -3, true)).toEqual([])
+test("两个池都空：返回 null（调用方据此跳过该好友）", () => {
+  expect(pickFriendText([], [])).toBe(null)
 })
 
 // 回归（用户 run 22 真机反馈）：同账户两个好友收到了同一条文案。
@@ -236,8 +233,7 @@ test("count 为 0 或负数：不发", () => {
 // 前面好友已挑走的文案。
 test("前面好友挑走的文案不再挑：同账户多好友不同文案", () => {
   for (let i = 0; i < 50; i++) {
-    const texts = pickFriendTexts(["专属甲", "专属乙"], ["全局一"], 1, true, new Set(["专属甲"]))
-    expect(texts).toEqual(["专属乙"])
+    expect(pickFriendText(["专属甲", "专属乙"], ["全局一"], new Set(["专属甲"]))).toBe("专属乙")
   }
 })
 
@@ -245,14 +241,21 @@ test("前面好友挑走的文案不再挑：同账户多好友不同文案", ()
 // 好友说同一句专属，也不跳过、也绝不落全局。
 test("专属轮空：在本池内随机补足，不跳过也不落全局", () => {
   for (let i = 0; i < 50; i++) {
-    const texts = pickFriendTexts(["专属甲"], ["全局一", "全局二"], 1, true, new Set(["专属甲"]))
-    expect(texts).toEqual(["专属甲"])
+    expect(pickFriendText(["专属甲"], ["全局一", "全局二"], new Set(["专属甲"]))).toBe("专属甲")
   }
 })
 
 test("全局池轮空：同样在本池内随机补足，没得发比重复更糟", () => {
   for (let i = 0; i < 50; i++) {
-    const texts = pickFriendTexts([], ["全局一"], 1, true, new Set(["全局一"]))
-    expect(texts).toEqual(["全局一"])
+    expect(pickFriendText([], ["全局一"], new Set(["全局一"]))).toBe("全局一")
+  }
+})
+
+// used 只在同轮内生效：下一轮重新开始时好友还能再收到这条
+test("used 是调用方传进来的：不传就不去重", () => {
+  const seen = new Set<string>()
+  for (let i = 0; i < 50; i++) {
+    expect(pickFriendText(["专属甲"], [], seen)).toBe("专属甲")
+    seen.add("专属甲")
   }
 })

@@ -66,10 +66,7 @@ export type ProxySetting = {
 export type RuntimeSettings = {
   timezone: string
   schedule: { startHour: number; startMinute: number; endHour: number; endMinute: number }
-  perFriendMessages: [number, number]
-  dedupeMessagesPerFriend: boolean
   shuffleFriends: boolean
-  gapBetweenMessagesMs: [number, number]
   gapBetweenFriendsMs: [number, number]
   gapBetweenAccountsMs: [number, number]
   typingCps: [number, number]

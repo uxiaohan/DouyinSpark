@@ -16,7 +16,7 @@ import type {
   RunSummary,
   RuntimeSettings,
 } from "./types"
-import { randInt, randMs, sampleN, shuffle, sleep } from "./util"
+import { pick, randMs, shuffle, sleep } from "./util"
 
 export type { RunSummary } from "./types"
 
@@ -110,7 +110,9 @@ export async function handleFriend(
       outcome = { status: "failed", messages: 0, reason: String(err).slice(0, 200) }
     }
     if (outcome.status !== "failed") break
-    if (attempt < attempts) await sleep(randMs(state.settings.gapBetweenMessagesMs))
+    // 重试前的停顿用好友间隔：消息间隔随"每好友多条"一起删了，
+    // 这里不能留空——连续失败时不喘口气就是连续风控面
+    if (attempt < attempts) await sleep(randMs(state.settings.gapBetweenFriendsMs))
   }
 
   if (outcome.status === "failed") {
@@ -139,7 +141,10 @@ export function summarize(
 }
 
 /**
- * 给一个好友挑本轮要发的文案。
+ * 给一个好友挑本轮要发的那一条文案。**每个好友每轮固定只发 1 条**
+ * （用户 2026-10-05 口径：消息条数旋钮整个删掉）——过去 perFriendMessages
+ * 是 [1,N] 随机，配上 retryPerFriend 会出现"设了 1 条却发了好几条"，
+ * 真人好友被反复打扰，这个能力不值得留。
  *
  * 池子的归属规则（用户口径）：**账号有专属文案就不碰全局**——专属是这个
  * 账号的，全局只服务没有专属的账号。专属非空时只用专属池，专属不够就
@@ -148,31 +153,20 @@ export function summarize(
  * used 是本轮运行里**前面好友已经挑走**的文案：同账户多好友优先发不同
  * 的（用户实测两个好友收到同一文案）。专属池被轮空时，还在专属池里随机
  * 抽（用户 21:44 口径：宁可对两个人说同一句专属，也不跳过、也不落全局）。
- * 只有落到全局池时，轮空同样随机补足——没得发比重复更糟。
+ * 只有落到全局池时，轮空同样随机补足——没得发比重复更糟。两个池都空返回
+ * null，调用方据此跳过该好友。
  */
-export function pickFriendTexts(
+export function pickFriendText(
   messages: readonly string[],
   fallback: readonly string[],
-  count: number,
-  dedupe: boolean,
   used: ReadonlySet<string> = new Set(),
-): string[] {
-  const n = Math.max(0, count)
+): string | null {
   const pool = messages.length > 0 ? messages : fallback
-  const picked = sampleN(
-    pool.filter((t) => !used.has(t)),
-    n,
-    dedupe,
-  )
-  if (picked.length >= n) return picked
+  if (pool.length === 0) return null
+  const avail = pool.filter((t) => !used.has(t))
   // 池子被前面好友轮空：在本池内随机补足（可能和别的好友重复），
   // 但绝不去另一个池——池的归属是硬规则
-  const more = sampleN(
-    pool.filter((t) => !picked.includes(t)),
-    n - picked.length,
-    dedupe,
-  )
-  return [...picked, ...more]
+  return pick(avail.length > 0 ? avail : pool)
 }
 
 async function driveFriend(
@@ -190,35 +184,22 @@ async function driveFriend(
   const blocked = await detectBlocked(page)
   if (blocked) return { status: "failed", messages: 0, reason: `风控: ${blocked}` }
 
-  const left = capLeft()
-  const want = randInt(s.perFriendMessages[0], Math.max(s.perFriendMessages[0], s.perFriendMessages[1]))
-  const texts = pickFriendTexts(pool, fallback, Math.min(want, Math.max(left, 0)), s.dedupeMessagesPerFriend, used)
-  // 挑完就登记：同账户下一个好友不再挑到同一条（多好友不发重复文案）
-  for (const t of texts) used.add(t)
-  log.info("挑选本轮文案", { friend: friend.name, own: pool.length, fallback: fallback.length, texts })
-  if (left <= 0) return { status: "skipped", messages: 0, reason: "已达当日上限" }
-  // 只有"这个账号一条文案都没有"才会走到这里：专属空→走全局，全局也空
-  if (texts.length === 0) return { status: "skipped", messages: 0, reason: "无可用文案" }
+  if (capLeft() <= 0) return { status: "skipped", messages: 0, reason: "已达当日上限" }
 
-  let sent = 0
+  // 每个好友每轮只发 1 条
+  const text = pickFriendText(pool, fallback, used)
+  // 只有"这个账号一条文案都没有"才会走到这里：专属空→走全局，全局也空
+  if (text === null) return { status: "skipped", messages: 0, reason: "无可用文案" }
+  // 挑完就登记：同账户下一个好友不再挑到同一条（多好友不发重复文案）
+  used.add(text)
+  log.info("挑选本轮文案", { friend: friend.name, own: pool.length, fallback: fallback.length, text })
+
+  const now = await detectBlocked(page)
+  if (now) return { status: "failed", messages: 0, reason: `风控: ${now}` }
+  const r = await sendTextMessage(page, text, s.typingCps)
+  if (!r.ok) return { status: "failed", messages: 0, reason: r.reason }
   // 发送状态不确定但按已发送计数的留痕：成功也有非空 reason，落 run_items 可查
-  const notes: string[] = []
-  for (const text of texts) {
-    const now = await detectBlocked(page)
-    if (now) {
-      return {
-        status: sent > 0 ? "success" : "failed",
-        messages: sent,
-        reason: [`风控: ${now}`, ...notes].join("；"),
-      }
-    }
-    const r = await sendTextMessage(page, text, s.typingCps)
-    if (!r.ok) return { status: "failed", messages: sent, reason: [r.reason, ...notes].join("；") }
-    if (r.uncertain) notes.push(r.uncertain)
-    sent += 1
-    await sleep(randMs(s.gapBetweenMessagesMs))
-  }
-  return { status: "success", messages: sent, reason: notes.length > 0 ? notes.join("；") : null }
+  return { status: "success", messages: 1, reason: r.uncertain ?? null }
 }
 
 async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountResult> {
