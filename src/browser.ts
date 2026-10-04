@@ -1,4 +1,3 @@
-import { chromium } from "playwright"
 import type { Browser, BrowserContext, Page } from "playwright"
 import { parseCookies } from "./config"
 import { EVASION_SCRIPT, pickFingerprint } from "./fingerprint"
@@ -29,6 +28,9 @@ function proxyKey(proxy: ProxySetting | null): string {
 }
 
 async function launch(proxy: ProxySetting | null): Promise<Browser> {
+  // playwright 的 JS 驱动静态 import 会常驻约 74MB RSS，而控制台一天 23 个小时都在空跑——
+  // 这里按需动态加载，只有真拉浏览器时才付这笔内存。import() 结果有缓存，每天首批只多付一次解析开销
+  const { chromium } = await import("playwright")
   const base = {
     headless: process.env.HEADFUL !== "1",
     args: LAUNCH_ARGS,
