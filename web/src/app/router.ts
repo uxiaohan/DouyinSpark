@@ -3,7 +3,7 @@ import { createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
 import { isAuthenticated, probeSession } from '@/lib/session'
 import { routes } from './routes'
 
-export function createAppRouter(
+function createAppRouter(
   history?: RouterHistory,
 ) {
   const router = createRouter({

@@ -1,4 +1,4 @@
-export interface MetricValue {
+interface MetricValue {
   prefix: string
   value: number
   decimals: number

@@ -2,13 +2,13 @@ import type { RouteRecordRaw } from 'vue-router'
 
 export type AppRouteName = 'login' | 'dashboard' | 'accounts' | 'friends' | 'messages' | 'settings' | 'logs' | 'about'
 
-export type PageMeta = {
+type PageMeta = {
   title: string
   description: string
   requiresAuth: boolean
 }
 
-export const routeMeta: Record<AppRouteName, PageMeta> = {
+const routeMeta: Record<AppRouteName, PageMeta> = {
   login: { title: '登录', description: '输入控制台口令后继续。', requiresAuth: false },
   dashboard: { title: '指挥台', description: '运行状态、调度窗口与最近运行记录。', requiresAuth: true },
   accounts: { title: '账号管理', description: '管理抖音账号、登录态与代理配置。', requiresAuth: true },

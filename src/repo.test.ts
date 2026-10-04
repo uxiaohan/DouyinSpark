@@ -21,7 +21,6 @@ const {
   getSession,
   deleteSession,
   touchAccountRun,
-  updateFriend,
 } = repo
 
 beforeEach(reset)
@@ -90,7 +89,7 @@ test("listAccounts(onlyEnabled) 过滤禁用账号", () => {
 test("touchAccountRun 更新时间戳", () => {
   const id = createAccount({ alias: "a" })
   touchAccountRun(id)
-  expect(repo.getAccount(id)!.last_run_at).not.toBeNull()
+  expect(listAccounts().find((a) => a.id === id)!.last_run_at).not.toBeNull()
 })
 
 test("session 存取与删除", () => {
@@ -108,13 +107,6 @@ test("createFriend 入库前把空白折叠成普通空格", () => {
   createFriend(id, "小明\u00A0阿花")
   createFriend(id, "  全角\u3000空格  ")
   expect(listFriends(id).map((f) => f.name)).toEqual(["小明 阿花", "全角 空格"])
-})
-
-test("updateFriend 同样折叠空白", () => {
-  const id = createAccount({ alias: "a" })
-  const fid = createFriend(id, "旧名")
-  updateFriend(fid, { name: "新\u00A0名" })
-  expect(listFriends(id).map((f) => f.name)).toEqual(["新 名"])
 })
 
 // 添加好友查重用：折叠空白后比较——从抖音复制来的 NBSP 和手打的普通空格必须算

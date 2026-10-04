@@ -12,7 +12,7 @@ import type {
   SessionRow,
 } from "./types"
 
-export type AccountInput = {
+type AccountInput = {
   alias: string
   cookie_json?: string | null
   proxy_server?: string | null
@@ -22,7 +22,7 @@ export type AccountInput = {
   daily_cap?: number | null
 }
 
-export type RunItemInput = {
+type RunItemInput = {
   run_id: number
   account_id: number | null
   friend_id: number | null
@@ -67,10 +67,6 @@ export function listAccounts(onlyEnabled = false): AccountRow[] {
     ? "SELECT * FROM accounts WHERE enabled = 1 ORDER BY id"
     : "SELECT * FROM accounts ORDER BY id"
   return db.query(sql).all() as AccountRow[]
-}
-
-export function getAccount(id: number): AccountRow | undefined {
-  return db.query("SELECT * FROM accounts WHERE id = ?").get(id) as AccountRow | undefined
 }
 
 export function createAccount(input: AccountInput): number {
@@ -127,11 +123,6 @@ export function createFriend(accountId: number, name: string): number {
       .query("INSERT INTO friends (account_id, name, created_at) VALUES (?, ?, ?)")
       .run(accountId, foldSpace(name), nowISO()).lastInsertRowid,
   )
-}
-
-export function updateFriend(id: number, patch: { name?: string }): void {
-  if (patch.name === undefined) return
-  db.query("UPDATE friends SET name = ? WHERE id = ?").run(foldSpace(patch.name), id)
 }
 
 export function deleteFriend(id: number): void {

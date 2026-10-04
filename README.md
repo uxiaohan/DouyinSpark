@@ -28,7 +28,7 @@
 | Chrome | 任意较新版本 | **必须本机安装**。运行用 `channel: "chrome"` 起真实 Chrome，不依赖 Playwright 自带的 chromium |
 | Node | ≥ 18 | 前端类型检查必须用它：`vue-tsc` 靠补丁 `fs.readFileSync` 给 tsc 注入 Vue 插件，只在 Node 运行时生效。Bun 运行时下补丁失效，所有 `.vue` 导入会报 TS2307（后端和 `vite build` 仍由 Bun 驱动） |
 
-依赖只有三个：`playwright`、`hono`、`@types/bun`（dev）。前端额外用 `vue` + `vue-router`。
+依赖只有四个：`playwright`、`hono`、`@hono/bun`，以及 dev 依赖 `@types/bun`。前端额外用 `vue` + `vue-router`。
 
 用 Docker 部署则本机不需要 Bun、Node 和 Chrome，见下文「Docker 部署」。
 
@@ -309,5 +309,5 @@ src/
   calibrate.ts       真实 DOM 探针
   web/               Hono API 与认证
 web/                 Vue3 控制台前端
-scripts/             辅助脚本（清库、API 冒烟）
+scripts/             辅助脚本（清库）
 ```

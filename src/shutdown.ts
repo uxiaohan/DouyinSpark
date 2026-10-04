@@ -2,7 +2,7 @@ import { closeAllBrowsers } from "./browser"
 import { log } from "./logger"
 import { isRunning, requestStop } from "./runner"
 
-export type ShutdownPlan = "drain" | "force" | "exit"
+type ShutdownPlan = "drain" | "force" | "exit"
 
 /**
  * 收到退出信号时的动作：
@@ -25,7 +25,7 @@ const DRAIN_TIMEOUT_MS = 120_000
  * - 父进程里的运行子进程（web-server 模式）——父进程从不 import playwright，
  *   收尾 = 转发 SIGTERM 给子进程等它自己 drain，强制 = SIGKILL，无需清理。
  */
-export interface DrainTarget {
+interface DrainTarget {
   /** 是否忙（决定 drain 还是直接退） */
   isBusy: () => boolean
   /** drain：请求在当前边界收尾，并等到不忙 */

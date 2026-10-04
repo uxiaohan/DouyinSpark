@@ -1,9 +1,9 @@
 import { ref } from 'vue'
 
-export type ToastTone = 'success' | 'info' | 'warning' | 'error'
-export type ToastItem = { id: number; message: string; tone: ToastTone }
+type ToastTone = 'success' | 'info' | 'warning' | 'error'
+type ToastItem = { id: number; message: string; tone: ToastTone }
 
-export function createToastStore(lifetime = 3200) {
+function createToastStore(lifetime = 3200) {
   const toasts = ref<ToastItem[]>([])
   const timers = new Map<number, ReturnType<typeof setTimeout>>()
   let nextId = 0

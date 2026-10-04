@@ -38,7 +38,7 @@ const SEND_STABLE_MS = 500
 const DRAFT_VERIFY_MS = 3_000
 
 /** 发送结果 */
-export type SendVerdict = "sent" | "failed" | "uncertain"
+type SendVerdict = "sent" | "failed" | "uncertain"
 
 /**
  * 终态确认的时间参数。生产走默认值；测试注入小值把 15s 的确认预算压下来，
@@ -53,16 +53,16 @@ export type SendTimings = {
 }
 
 /** 发给调用方的发送结果：uncertain 已按草稿兜底裁掉，只剩确定结论 */
-export type SendResult =
+type SendResult =
   | { ok: true; uncertain?: string }
   | { ok: false; reason: string }
 
 /** 打开好友会话的结果，reason 原样落 run_items */
-export type OpenFriendFailReason = "未找到好友会话" | "会话打开未确认"
-export type OpenFriendResult = { ok: true } | { ok: false; reason: OpenFriendFailReason }
+type OpenFriendFailReason = "未找到好友会话" | "会话打开未确认"
+type OpenFriendResult = { ok: true } | { ok: false; reason: OpenFriendFailReason }
 
 /** 打开聊天页的结果：风控要停整个账号，登录失效走 cookie 失效 semantics */
-export type ChatPageResult =
+type ChatPageResult =
   | { ok: true }
   | { ok: false; kind: "risk"; blocked: string }
   | { ok: false; kind: "login" }
@@ -280,13 +280,13 @@ async function confirmChatOpen(page: Page, friendName: string, timeoutMs = 8000)
   return false
 }
 
-export async function clearInput(page: Page): Promise<void> {
+async function clearInput(page: Page): Promise<void> {
   await page.keyboard.press("Control+A")
   await page.keyboard.press("Backspace")
 }
 
 /** 逐字插入 + 每字随机停顿，模拟真人输入 */
-export async function typeMessage(page: Page, text: string, typingCps: [number, number]): Promise<void> {
+async function typeMessage(page: Page, text: string, typingCps: [number, number]): Promise<void> {
   const input = await firstVisible(page, SEL.messageInput)
   if (!input) throw new Error("未找到消息输入框")
   await input.click()
@@ -407,7 +407,7 @@ export async function markSeenOutgoing(page: Page, text: string): Promise<void> 
 }
 
 /** 一条本人气泡在发送确认眼里的状态 */
-export type BubbleState = "missing" | "failure" | "pending" | "clean"
+type BubbleState = "missing" | "failure" | "pending" | "clean"
 
 /** 读"发送的那条气泡"当前状态：没挂上 / 有失败标记 / 在转圈 / 干净（导出供测试驱动状态机） */
 export async function readBubbleState(page: Page, text: string): Promise<BubbleState> {

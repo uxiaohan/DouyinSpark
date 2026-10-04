@@ -17,7 +17,7 @@ import {
   listMessages,
 } from "./repo"
 
-export interface SeedResult {
+interface SeedResult {
   settings: boolean
   messages: number
   sampleAccount: boolean

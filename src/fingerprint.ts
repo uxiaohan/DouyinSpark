@@ -1,6 +1,6 @@
 import { pick } from "./util"
 
-export type Fingerprint = {
+type Fingerprint = {
   userAgent: string
   viewport: { width: number; height: number }
   deviceScaleFactor: number
@@ -23,7 +23,7 @@ const OS_TOKEN: Record<string, string> = {
 }
 
 /** UA 的平台段必须和本机一致： Playwright 只会改 UA，不改 HTTP 头与 navigator.platform */
-export const OS_TOKEN_STR = OS_TOKEN[process.platform] ?? OS_TOKEN.win32 as string
+const OS_TOKEN_STR = OS_TOKEN[process.platform] ?? OS_TOKEN.win32 as string
 
 /**
  * UA 版本段取真实浏览器版本。

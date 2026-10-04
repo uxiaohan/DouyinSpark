@@ -5,7 +5,7 @@ import { ref } from 'vue'
  * 与 useToasts 同一模式——模块级单例 + App 内挂一个 Region。
  */
 
-export type ConfirmOptions = {
+type ConfirmOptions = {
   title?: string
   message: string
   confirmText?: string

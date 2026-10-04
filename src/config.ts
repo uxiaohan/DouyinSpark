@@ -1,7 +1,7 @@
 import { getSetting, listAccounts, listFriends, listMessages, setSetting } from "./repo"
 import type { AccountRuntime, RunConfig, RuntimeSettings } from "./types"
 
-export type PlaywrightCookie = {
+type PlaywrightCookie = {
   name: string
   value: string
   domain: string

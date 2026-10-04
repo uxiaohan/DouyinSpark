@@ -1,5 +1,5 @@
 import { getSetting, setSetting } from "../repo"
-import { cryptoRandomStringAsync } from "./crypto"
+import { cryptoRandomString } from "./crypto"
 
 /** 会话 24 小时有效 */
 const TTL_MS = 24 * 3600 * 1000
@@ -13,7 +13,7 @@ const PASSWORD_KEY = "admin_password_hash"
  * 算法可以避免 Bun 将来改默认值导致新旧哈希不一致；verify 会按哈希前缀
  * 自动判别，所以历史上已写入的 argon2id 哈希仍能正常校验。
  */
-export function hashPassword(password: string): Promise<string> {
+function hashPassword(password: string): Promise<string> {
   return Bun.password.hash(password, { algorithm: "bcrypt" })
 }
 
@@ -44,7 +44,7 @@ export async function writePasswordHash(password: string): Promise<void> {
 }
 
 export async function issueSession(): Promise<{ token: string; expiresAt: string }> {
-  const token = await cryptoRandomStringAsync(32)
+  const token = cryptoRandomString(32)
   const expiresAt = new Date(Date.now() + TTL_MS).toISOString()
   return { token, expiresAt }
 }

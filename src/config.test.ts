@@ -96,5 +96,5 @@ test("validateSchedule 拒绝越界与非整数钟点", () => {
 test("updateAccount 可改别名且不影响其它账号", () => {
   const id = createAccount({ alias: "before" })
   updateAccount(id, { alias: "after" })
-  expect(repo.getAccount(id)!.alias).toBe("after")
+  expect(repo.listAccounts().find((a) => a.id === id)!.alias).toBe("after")
 })

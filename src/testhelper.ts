@@ -17,7 +17,3 @@ const TABLES = ["run_items", "runs", "messages", "friends", "accounts", "setting
 export function reset(): void {
   for (const t of TABLES) db.exec(`DELETE FROM ${t}`)
 }
-
-export function cleanup(): void {
-  db.close()
-}

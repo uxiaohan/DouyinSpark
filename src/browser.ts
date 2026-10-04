@@ -4,7 +4,7 @@ import { EVASION_SCRIPT, pickFingerprint } from "./fingerprint"
 import { log } from "./logger"
 import type { AccountRow, ProxySetting } from "./types"
 
-export type AccountPage = { context: BrowserContext; page: Page }
+type AccountPage = { context: BrowserContext; page: Page }
 
 const browsers = new Map<string, Browser>()
 
@@ -51,7 +51,7 @@ async function launch(proxy: ProxySetting | null): Promise<Browser> {
 }
 
 /** 按代理分组复用浏览器实例：同代理的账号共用一个 browser，各自独立 context */
-export async function getBrowser(proxy: ProxySetting | null): Promise<Browser> {
+async function getBrowser(proxy: ProxySetting | null): Promise<Browser> {
   const key = proxyKey(proxy)
   const cached = browsers.get(key)
   if (cached && cached.isConnected()) return cached

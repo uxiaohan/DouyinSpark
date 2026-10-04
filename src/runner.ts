@@ -37,8 +37,8 @@ export function resetStop(): void {
   stopRequested = false
 }
 
-export type FriendOutcome = { status: ItemStatus; messages: number; reason: string | null }
-export type FriendDriver = (friend: FriendRow, attempt: number) => Promise<FriendOutcome>
+type FriendOutcome = { status: ItemStatus; messages: number; reason: string | null }
+type FriendDriver = (friend: FriendRow, attempt: number) => Promise<FriendOutcome>
 
 export type RunState = {
   runId: number
