@@ -28,10 +28,8 @@ bun install
 ## 快速开始
 
 ```bash
-# 1. 初始化数据库（写入示例账号、好友和文案，方便先看清楚结构）
-bun run seed
-
-# 2. 启动控制台（默认 0.0.0.0:8787）
+# 启动控制台（默认 0.0.0.0:8787）。全新库首启会自动写入示例数据，
+# 不需要（也没有）单独的初始化步骤；想手动补齐再跑 bun run seed
 bun run web
 ```
 
@@ -77,7 +75,7 @@ bun run now
 | `bun run web-server.ts --web-only` | 只跑控制台，不进调度（调试用） |
 | `bun run start` | 只跑调度循环，不起控制台 |
 | `bun run now` | 立刻手动跑一批（不走调度） |
-| `bun run seed` | 写入示例数据 |
+| `bun run seed` | 手动补写默认数据（首启已自动执行且幂等，一般用不到） |
 | `bun run calibrate` | 打开真实页面 dump DOM + 截图到 `logs/calibrate.png`，用来更新选择器 |
 | `bun test` | 跑全部单测 |
 | `bun run typecheck` | 后端类型检查 |

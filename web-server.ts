@@ -2,6 +2,7 @@ import { serveStatic } from "@hono/bun"
 import { existsSync } from "node:fs"
 import { log } from "./src/logger"
 import { createApp } from "./src/web"
+import { seedDefaults } from "./src/seed"
 import { startScheduler } from "./src/scheduler"
 import { reapStaleRuns } from "./src/repo"
 import { installShutdownHandlers } from "./src/shutdown"
@@ -18,6 +19,13 @@ if (existsSync("web/dist")) {
 }
 
 log.info("控制台启动", { port: PORT, staticHosted: existsSync("web/dist"), webOnly: process.argv.includes("--web-only") })
+
+// 全新库只有表结构没有数据，而 docker 用户够不着 `bun run seed`；首启补一次默认数据，
+// 之后每项都有空判保护，非空库再来只是空转
+const seeded = seedDefaults()
+if (seeded.settings) log.info("首启写入默认设置")
+if (seeded.messages > 0) log.info("首启写入全局文案池", { count: seeded.messages })
+if (seeded.sampleAccount) log.info("首启写入示例账号与好友")
 
 // 上次进程若被硬杀，runs 表里会留下永远"进行中"的行；刚启动没有别人的运行，全是尸体
 const reaped = reapStaleRuns()
