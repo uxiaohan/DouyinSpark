@@ -44,6 +44,20 @@ dd > i { display: block; width: 5px; height: 5px; flex: 0 0 auto; align-self: ce
 .table-footer > div { display: flex; align-items: center; gap: 6px; }
 .table-footer strong { min-width: 20px; color: #555863; font-size: 13px; text-align: center; }
 
+/* 列表页（文案池/账号/好友）内容多的时候应该表格区域自己滚，而不是整页滚：
+   以前 198 条文案能把页面拉到一万多 px，滚两页工具条、汇总、页脚全跑没影了。
+   这里把 .main-scroll → .workspace → .view-stage → .users-view 这条链撑满视口剩余高度，
+   表格区 (.data-surface) 成为唯一滚动容器，页面外壳全部钉住，表头吸顶。
+   只圈定列表页（:has(> .users-view)），其它页内容超长时仍旧整页滚，行为不变；
+   窗口太矮（<560px）时表格区只剩几行不够用，回落整页滚 */
+@media (min-height: 560px) {
+  .workspace { display: flex; height: 100%; flex-direction: column; }
+  .view-stage:has(> .users-view) { display: flex; flex: 1; min-height: 0; }
+  .view-stage:has(> .users-view) > .users-view { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
+  .users-view > .data-surface { flex: 1; min-height: 0; overflow: auto; }
+  .data-surface th { position: sticky; top: 0; z-index: 1; }
+}
+
 
 @media (max-width: 900px) {
   .view-toolbar { flex-wrap: wrap; }
