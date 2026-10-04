@@ -20,6 +20,10 @@ COPY . .
 RUN bun run build:web
 
 FROM oven/bun:1.4-slim AS runtime
+# WORKDIR 必须在任何 COPY 之前显式指定：oven/bun 基础镜像自带 WORKDIR /home/bun/app，
+# 不写的话下面所有 COPY ... ./ 都落进 /home/bun/app，而 CMD 又在 /app 里找入口，
+# 构建全程不报错，只在运行时炸 error: Module not found "web-server.ts"，然后 restart 循环刷屏
+WORKDIR /app
 # DOUYIN_CONTAINER=1：浏览器加 --no-sandbox 并跳过系统 chrome channel（镜像里没装 Chrome，走内置 chromium）
 # TZ：调度窗口按容器本地时间算，必须显式设为北京时间，否则每天按 UTC 漂移 8 小时
 ENV NODE_ENV=production \
@@ -41,8 +45,10 @@ COPY --from=builder --chown=bun:bun /app/web/dist ./web/dist
 COPY --chown=bun:bun package.json index.ts web-server.ts ./
 COPY --chown=bun:bun src ./src
 RUN mkdir -p /app/data /app/logs && chown bun:bun /app/data /app/logs
+# 兜底：入口/依赖/前端产物没落在 /app 就直接让构建失败。
+# WORKDIR 写漏、COPY 目标写错都属于"构建静默通过、运行时 Module not found"一类，在这里炸掉比在用户机器上循环重启好
+RUN test -f /app/web-server.ts && test -d /app/node_modules && test -d /app/src && test -d /app/web/dist
 USER bun
-WORKDIR /app
 EXPOSE 8787
 # /api/bootstrap 无需登录，探活只关心进程在、HTTP 通路在
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
