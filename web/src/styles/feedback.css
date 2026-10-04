@@ -84,7 +84,13 @@
 .feedback-status i { display: block; width: 5px; height: 5px; flex: 0 0 auto; align-self: center; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgb(19 128 94 / 0.08); }
 .feedback-status p { margin: 0; }
 
-.showcase-dialog { width: min(440px, calc(100vw - 32px)); max-width: none !important; gap: 16px; border: 1px solid #dfe2e8; border-radius: 9px !important; box-shadow: 0 28px 90px rgb(18 23 43 / 0.2); }
+/* 兜底限高：这个弹窗是 translate 垂直居中的，内容一旦超高就上下一起跑出视口，
+   底部的取消/保存会整个跑到屏幕外，怎么滚页面都够不着。这里整体封顶 + 内部滚动，
+   保证任何内容长度下按钮都够得着（dvh 兼容移动端浏览器工具栏，旧浏览器回落 vh） */
+.showcase-dialog { width: min(440px, calc(100vw - 32px)); max-width: none !important; gap: 16px; border: 1px solid #dfe2e8; border-radius: 9px !important; box-shadow: 0 28px 90px rgb(18 23 43 / 0.2); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
+/* 长文本域（cookie JSON 等）用了 field-sizing-content 随内容自动增高，不封顶会把弹窗顶爆；
+   封顶后域内自己滚，弹窗高度不再被输入内容绑架 */
+.showcase-dialog textarea { max-height: 32vh; }
 .showcase-dialog [data-slot="dialog-title"] { font-size: 14px; font-weight: 650; line-height: 20px; }
 .showcase-dialog [data-slot="dialog-description"] { color: var(--text-muted); font-size: 12px; line-height: 18px; }
 .showcase-dialog-footer { padding: 12px 16px; flex-direction: row; justify-content: flex-end; border-radius: 0 0 9px 9px !important; background: #fafbfc; }
