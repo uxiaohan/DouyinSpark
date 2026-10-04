@@ -29,15 +29,18 @@ ENV NODE_ENV=production \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl tini tzdata \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/web/dist ./web/dist
-COPY package.json index.ts web-server.ts ./
-COPY src ./src
-# chromium：--with-deps 一并装齐运行所需的系统库；装完放开读权限给运行用户
+# 归属在 COPY 时直接落 bun:bun：若留到后面对 /app 做 chown -R，overlayfs 会把整个 node_modules
+# 复制上进层，镜像平白多出一份完整依赖的体积。运行时要写的只有 data（sqlite）和 logs（calibrate 截图）
+COPY --from=deps --chown=bun:bun /app/node_modules ./node_modules
+# chromium 只取决于 node_modules 里 playwright 的版本，排在源码拷贝之前：
+# 以后改 src/ 顶掉的是最后的代码层，这一层命中缓存，不用重新下载 150MB+
 RUN bunx playwright install --with-deps chromium \
-    && chmod -R a+rX /ms-playwright
-# 数据目录（sqlite + wal/shm）预建并交给运行用户，挂卷后权限一致
-RUN mkdir -p /app/data && chown -R bun:bun /app
+    && chmod -R a+rX /ms-playwright \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder --chown=bun:bun /app/web/dist ./web/dist
+COPY --chown=bun:bun package.json index.ts web-server.ts ./
+COPY --chown=bun:bun src ./src
+RUN mkdir -p /app/data /app/logs && chown bun:bun /app/data /app/logs
 USER bun
 WORKDIR /app
 EXPOSE 8787

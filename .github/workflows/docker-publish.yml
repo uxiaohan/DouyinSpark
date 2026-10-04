@@ -1,57 +1,118 @@
-# 手动触发：构建镜像并推送到 GitHub Container Registry（ghcr.io）。
-# Actions → Publish Docker image → Run workflow；每次自动打 sha-<短commit> 标签，另按输入打 latest / 版本标签。
-# 默认构建 linux/amd64 + linux/arm64 双架构（Bun 官方镜像与 Playwright chromium 均无 armv7，双架构即全平台）。
+# 手动触发：Actions → Publish Docker image → Run workflow，一键构建推送，无需填任何参数。
+# 双 job 原生构建：amd64 用标准 runner，arm64 用 GitHub 免费 arm runner（public 仓库免费用），
+# 各自只按 digest 推送、不打 tag；merge job 用 imagetools 合成多架构 manifest，
+# 同时打 sha-<7位短哈希>（不可变，按 commit 回滚用）+ latest（始终指向最新一次构建）。
+# 不用 QEMU 模拟：arm64 每条指令都被解释执行，bun install / vue-tsc / apt 会慢 5-10 倍。
+# 代价：仓库必须 public——private 仓库用 arm runner 要付费套餐，那种情况应换回单 job + QEMU。
+# 前提：触发时构建的是已 push 的 commit，改完代码先 push。
 name: Publish Docker image
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 镜像标签（默认 latest，可写 v1.2.3）
-        required: false
-        default: latest
-      platforms:
-        description: 目标平台（默认 amd64+arm64 双架构；arm64 走 QEMU 模拟，会明显变慢）
-        required: false
-        default: linux/amd64,linux/arm64
-      move_latest:
-        description: 是否把 latest 也指向这次构建（发版本标签、不想动 latest 就关掉）
-        type: boolean
-        default: false
 
 permissions:
   contents: read
   packages: write
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
+  # 两个 build job 只差 runner 和平台。单平台 manifest 不完整，所以只推 digest 不打 tag，
+  # 等 merge 合成完整清单后再统一打，避免 latest 被半个镜像污染
+  build-amd64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      digest: ${{ steps.export.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # GHCR 镜像名强制小写；同时算一个短 sha 做不可变标签
-      - name: 镜像名与标签
-        id: meta
-        run: |
-          echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
-          echo "sha=$(echo '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
+      # GHCR 镜像名强制小写，而仓库名是 DouyinSpark 这种大小写混合
+      - name: 镜像名（小写）
+        id: vars
+        run: echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/build-push-action@v6
+      - name: 构建并推送 amd64（按 digest）
+        id: build
+        uses: docker/build-push-action@v7
         with:
           context: .
+          platforms: linux/amd64
           push: true
-          platforms: ${{ inputs.platforms }}
-          tags: |
-            ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.sha }}
-            ${{ steps.meta.outputs.image }}:${{ inputs.tag || 'latest' }}
-            ${{ inputs.move_latest && format('{0}:latest', steps.meta.outputs.image) || '' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          outputs: type=image,push-by-digest=true,name=${{ steps.vars.outputs.image }}
+          # 每个平台一个 cache scope：两个 job 共写同一 scope 会互相顶掉缓存
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,scope=amd64,mode=max
+
+      - name: 导出 digest
+        id: export
+        run: echo "digest=${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
+  build-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    outputs:
+      digest: ${{ steps.export.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GHCR 镜像名强制小写，而仓库名是 DouyinSpark 这种大小写混合
+      - name: 镜像名（小写）
+        id: vars
+        run: echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: 构建并推送 arm64（按 digest）
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          outputs: type=image,push-by-digest=true,name=${{ steps.vars.outputs.image }}
+          # 每个平台一个 cache scope：两个 job 共写同一 scope 会互相顶掉缓存
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,scope=arm64,mode=max
+
+      - name: 导出 digest
+        id: export
+        run: echo "digest=${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
+  # 任一一侧挂了就不合并：线上 latest 保持原样，最多留一个没有 tag 的游离镜像
+  merge:
+    runs-on: ubuntu-24.04
+    needs:
+      - build-amd64
+      - build-arm64
+    if: ${{ !cancelled() && needs.build-amd64.result == 'success' && needs.build-arm64.result == 'success' }}
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 无需 checkout：只用 digest 和 github context，不读 git 工作区
+      - name: 合并双架构 manifest 并打标签
+        run: |
+          set -euo pipefail
+          IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          SHA=${GITHUB_SHA:0:7}
+          docker buildx imagetools create \
+            -t "${IMAGE}:sha-${SHA}" \
+            -t "${IMAGE}:latest" \
+            "${IMAGE}@${{ needs.build-amd64.outputs.digest }}" \
+            "${IMAGE}@${{ needs.build-arm64.outputs.digest }}"

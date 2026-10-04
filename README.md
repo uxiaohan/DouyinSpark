@@ -149,9 +149,11 @@ docker compose -f docker-build-compose.yml up -d --build
 
 ### 发布镜像（GitHub Actions）
 
-仓库 **Actions → Publish Docker image → Run workflow**，可选填标签（默认 `latest`）。
-触发后基于**推送时的那个 commit** 构建 `linux/amd64`（平台框可填 `linux/amd64,linux/arm64` 出多架构，会慢不少），
-推到 `ghcr.io/uxiaohan/douyinspark:<tag>`，同时打一个 `sha-<短commit>` 的不可变标签方便回滚。
+仓库 **Actions → Publish Docker image → Run workflow**，无需填参数，点一下就跑。
+触发后基于**推送时的那个 commit**：amd64 在标准 runner、arm64 在 GitHub 免费 arm runner
+（public 仓库免费用，不走 QEMU 模拟，全程约 10 分钟）上**原生并行构建**，合成多架构 manifest
+推到 `ghcr.io/uxiaohan/douyinspark`，每次固定打两个标签：`sha-<7位短哈希>`（不可变，按 commit
+回滚用）和 `latest`（始终指向最新一次构建）。任一侧构建失败就不打新标签，线上镜像保持原样。
 所以改完代码先 push，再触发工作流。
 
 | 项 | 说明 |
