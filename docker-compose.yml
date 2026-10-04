@@ -3,6 +3,9 @@ services:
     image: ${DOUYIN_IMAGE:-ghcr.io/uxiaohan/douyinspark}:${DOUYIN_TAG:-latest}
     container_name: douyinspark
     restart: unless-stopped
+    # docker stop 的默认宽限只有 10s，而优雅停机要在当前好友边界收尾（最多 2 分钟）：
+    # 宽限设得比 DRAIN_TIMEOUT_MS 长一点，才轮得到容器内二次信号/SIGKILL 兜底
+    stop_grace_period: 2m10s
     # Chromium 默认只用 64MB /dev/shm，页面一复杂就崩；放大到 1GB
     shm_size: "1gb"
     ports:

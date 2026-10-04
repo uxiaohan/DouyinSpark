@@ -1,6 +1,6 @@
 import { loadSettings } from "./config"
 import { log } from "./logger"
-import { runOnce } from "./runner"
+import { runInChild } from "./run-child"
 import type { RuntimeSettings } from "./types"
 
 /**
@@ -118,7 +118,7 @@ export interface SchedulerDeps {
   now: () => number
   /** 睡到返回 false；被 wakeScheduler 提前结束返回 true（调用方据此重排而非运行） */
   sleep: (ms: number) => Promise<unknown>
-  /** 跑一批；返回值 discarded，运行结果由 runner 自己落库 */
+  /** 跑一批；返回值 discarded，运行结果由子进程自己落库 */
   run: () => Promise<unknown>
   loadSettings: () => RuntimeSettings
 }
@@ -126,7 +126,9 @@ export interface SchedulerDeps {
 const prodDeps: SchedulerDeps = {
   now: () => Date.now(),
   sleep: interruptibleSleep,
-  run: () => runOnce("schedule"),
+  // web-server 模式不自己 import playwright（Bun 的 ESM 缓存一导就永久常驻
+  // ~65MB，控制台一天 23 小时空跑不能替这 1 小时付内存），整批丢给子进程跑
+  run: () => runInChild("schedule"),
   loadSettings,
 }
 

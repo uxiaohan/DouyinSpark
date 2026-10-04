@@ -6,6 +6,11 @@ import { reapStaleRuns } from "./src/repo"
 
 const manual = process.argv.includes("--now")
 
+// 子进程 worker 模式（src/run-child.ts 拉起）：来源标签透传，run_items 里能和
+// 调度触发区分开；默认 manual 保持 `bun run now` 的口径
+const triggerIdx = process.argv.indexOf("--trigger")
+const trigger = triggerIdx >= 0 && process.argv[triggerIdx + 1] ? process.argv[triggerIdx + 1] : "manual"
+
 installShutdownHandlers()
 
 async function main(): Promise<void> {
@@ -13,7 +18,7 @@ async function main(): Promise<void> {
   const reaped = reapStaleRuns()
   if (reaped > 0) log.info("收尾残留的运行记录", { count: reaped })
   if (manual) {
-    const summary = await runOnce("manual")
+    const summary = await runOnce(trigger)
     console.log(
       JSON.stringify(
         {

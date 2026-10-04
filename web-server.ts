@@ -5,13 +5,21 @@ import { createApp } from "./src/web"
 import { seedDefaults } from "./src/seed"
 import { startScheduler } from "./src/scheduler"
 import { reapStaleRuns } from "./src/repo"
+import { isChildRunning, killChild, stopChild } from "./src/run-child"
 import { installShutdownHandlers } from "./src/shutdown"
 
 const PORT = Number(process.env.PORT ?? 8787)
 const app = createApp()
 
-// docker stop / Ctrl+C 时在当前好友边界收尾再退出，别把半条消息和未 finish 的运行记录留在库里
-installShutdownHandlers()
+// docker stop / Ctrl+C 时把信号落到运行子进程上：转发 SIGTERM 让它在当前好友
+// 边界收尾再退出，父进程等它跑完才退。父进程自己不 import playwright，
+// 常驻内存停在 15MB 量级；二次信号或 120s 收尾超时才 SIGKILL 强收摊
+installShutdownHandlers({
+  isBusy: isChildRunning,
+  drain: () => stopChild("SIGTERM"),
+  forceStop: killChild,
+  cleanup: () => {},
+})
 
 if (existsSync("web/dist")) {
   app.use("/*", serveStatic({ root: "./web/dist" }))

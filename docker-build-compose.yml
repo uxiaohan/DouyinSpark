@@ -8,6 +8,8 @@ services:
     image: douyinspark:latest
     container_name: douyinspark
     restart: unless-stopped
+    # 同 docker-compose.yml：宽限要比优雅停机的 2 分钟长，10s 默认宽限会 SIGKILL 掉正在收尾的运行
+    stop_grace_period: 2m10s
     # Chromium 默认只用 64MB /dev/shm，页面一复杂就崩；放大到 1GB
     shm_size: "1gb"
     ports:

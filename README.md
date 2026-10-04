@@ -162,7 +162,7 @@ docker compose -f docker-build-compose.yml up -d --build
 | 迁移旧数据 | 把本机 `data/app.db`（连同 `-wal` / `-shm`，如果有）复制到 compose 同级的 `./data/`，再 `docker compose up -d`。**同一台机器上别让本机控制台和容器同时跑**：两边共用同一个 SQLite 库，WAL 跨进程锁在 Windows 上会报 `database is locked` |
 | 绑定挂载权限 | 容器内运行用户是 uid/gid 1000（bun）。Linux 宿主先 `sudo chown -R 1000:1000 ./data`；Windows Docker Desktop 首次挂 D 盘需在 Settings → Resources → File Sharing 里放行 |
 | 换端口 | `DOUYIN_PORT=9000 docker compose up -d` |
-| 停机 | `docker stop` 发 SIGTERM，会等当前好友边界收尾再退出（优雅停机，最多 2 分钟）；容器内再次收到信号才强制退 |
+| 停机 | `docker stop` 发 SIGTERM，父进程转发给运行子进程，等当前好友边界收尾再退出（优雅停机，最多 2 分钟）；compose 宽限 2m10s，容器内再次收到信号才强制退 |
 | 日志 | json-file 滚动：单文件上限 10MB，保留 3 份 |
 
 和本机跑的两点差异：
@@ -183,6 +183,22 @@ docker compose -f docker-build-compose.yml up -d --build
 4. 逐字输入文案（速度按 `typingCps` 随机抖动），先确认草稿里真有这段文字才发。
 5. 命中验证码/风控文案 → 该好友记 `failed`；连续失败达到 `consecutiveFailAbort` → 中止整批。
 6. 全部跑完按 `notifyOnRun` / `notifyOnAbort` 决定是否推 PushDeer，推送失败不影响运行结果。
+
+### 关于进程模型
+
+控制台进程（web-server，含每日调度）**不自己跑浏览器**：每次运行都 spawn 一个
+`bun index.ts --now --trigger <t>` 子进程，父子之间只传退出码和信号。
+原因是 playwright 一旦 import 就在 Bun 的 ESM 缓存里永久常驻（实测 +65MB，
+强制 GC 收不回），而控制台一天 23 小时都在空跑——不隔离的话长期占用会从
+15MB 涨到 80MB 且只有重启才回落。隔进子进程后，父进程从头到尾不 import
+playwright，跑完子进程退出，内存连进程一起归还。`bun run now` /
+`docker exec ... bun run now` 仍是进程内一次性执行（跑完即退，无所谓常驻），
+worker 子进程与手动跑的是同一份 `runOnce`，不会漂移出两套行为。
+
+`docker stop` 的 SIGTERM 先落到父进程：有子进程在跑就转发 SIGTERM 让它在当前
+好友边界收尾，父进程等它退出再退；compose 里 `stop_grace_period: 2m10s` 比
+程序内的 2 分钟 drain 宽限稍长，才轮得到超时后的 SIGKILL 兜底。容器内再次收到
+信号才强制退。
 
 ### 关于发送方式
 
@@ -241,7 +257,7 @@ DOM API 用错），一律降级成 `uncertain` 走草稿兜底而不是判 `fai
 - 新链路真机全程成功一轮（run#4，2026-10-04）：`/chat` 打开 → 搜索找人 → 头部确认
   → 逐字输入 → 草稿校验 → 点发送 → 终态确认，3 好友各 1 条全 success，75 秒跑完。
 - 控制台：登录/登出、设置、账号、好友、文案、运行记录的读写；静态托管与 SPA 回退。
-- 单测 143 项通过（另有 1 项需要真浏览器，默认跳过）。
+- 单测 149 项通过（另有 1 项需要真浏览器，默认跳过）。
 
 **未验证（重要）**
 - **新链路只在本机 Chrome headful 下成功跑过这一轮**：容器内置 chromium
@@ -270,6 +286,7 @@ src/
   browser.ts         Playwright 启动与账号页面
   douyin.ts          聊天页打开、好友匹配、输入、发送与终态确认
   runner.ts          运行主循环
+  run-child.ts       调度运行丢进子进程（内存隔离）
   scheduler.ts       每日随机窗口
   notify.ts          PushDeer
   selectors.ts       全部 DOM 选择器（漂移时改这里）

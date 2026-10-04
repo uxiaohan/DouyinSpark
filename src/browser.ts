@@ -28,8 +28,10 @@ function proxyKey(proxy: ProxySetting | null): string {
 }
 
 async function launch(proxy: ProxySetting | null): Promise<Browser> {
-  // playwright 的 JS 驱动静态 import 会常驻约 74MB RSS，而控制台一天 23 个小时都在空跑——
-  // 这里按需动态加载，只有真拉浏览器时才付这笔内存。import() 结果有缓存，每天首批只多付一次解析开销
+  // playwright 一旦 import 就常驻在 Bun 的 ESM 缓存里（实测 +65MB，强制 GC 收不回），
+  // 而控制台一天 23 个小时都在空跑。web-server 模式已把整批运行丢进子进程
+  // （见 run-child.ts），父进程从头到尾不 import 到这里；进程内的一次性执行
+  // （bun run now / docker exec）则无所谓——跑完即退，内存随进程一起归还
   const { chromium } = await import("playwright")
   const base = {
     headless: process.env.HEADFUL !== "1",
