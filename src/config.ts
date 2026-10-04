@@ -19,7 +19,6 @@ export const DEFAULT_SETTINGS: RuntimeSettings = {
   gapBetweenFriendsMs: [5000, 10000],
   gapBetweenAccountsMs: [30000, 90000],
   typingCps: [8, 16],
-  maxScrollAttempts: 10,
   pushdeerKey: null,
   notifyOnRun: true,
   notifyOnAbort: true,
@@ -46,11 +45,6 @@ function readPair(k: string, def: [number, number]): [number, number] {
     return [v[0] as number, v[1] as number]
   }
   return def
-}
-
-function readNumber(k: string, def: number): number {
-  const v = readJSON(k)
-  return typeof v === "number" && Number.isFinite(v) ? v : def
 }
 
 function readBool(k: string, def: boolean): boolean {
@@ -106,7 +100,6 @@ export function loadSettings(): RuntimeSettings {
     gapBetweenFriendsMs: readPair("gapBetweenFriendsMs", d.gapBetweenFriendsMs),
     gapBetweenAccountsMs: readPair("gapBetweenAccountsMs", d.gapBetweenAccountsMs),
     typingCps: readPair("typingCps", d.typingCps),
-    maxScrollAttempts: readNumber("maxScrollAttempts", d.maxScrollAttempts),
     pushdeerKey: readNullableString("pushdeerKey"),
     notifyOnRun: readBool("notifyOnRun", d.notifyOnRun),
     notifyOnAbort: readBool("notifyOnAbort", d.notifyOnAbort),
@@ -125,7 +118,6 @@ export function saveSettings(s: RuntimeSettings): void {
   setSetting("gapBetweenFriendsMs", s.gapBetweenFriendsMs)
   setSetting("gapBetweenAccountsMs", s.gapBetweenAccountsMs)
   setSetting("typingCps", s.typingCps)
-  setSetting("maxScrollAttempts", s.maxScrollAttempts)
   setSetting("pushdeerKey", s.pushdeerKey)
   setSetting("notifyOnRun", s.notifyOnRun)
   setSetting("notifyOnAbort", s.notifyOnAbort)

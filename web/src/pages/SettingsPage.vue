@@ -24,7 +24,6 @@ const form = reactive({
   accountGapMax: 180000,
   typingCpsMin: 5,
   typingCpsMax: 12,
-  maxScrollAttempts: 3,
   shuffleFriends: true,
   dailyCapPerAccount: 100,
   retryPerFriend: 1,
@@ -52,7 +51,6 @@ function toSettings(): Settings {
     gapBetweenFriendsMs: [form.friendGapMin, form.friendGapMax],
     gapBetweenAccountsMs: [form.accountGapMin, form.accountGapMax],
     typingCps: [form.typingCpsMin, form.typingCpsMax],
-    maxScrollAttempts: form.maxScrollAttempts,
     pushdeerKey: form.pushdeerKey.trim() === '' ? null : form.pushdeerKey.trim(),
     notifyOnRun: form.notifyOnRun,
     notifyOnAbort: form.notifyOnAbort,
@@ -70,7 +68,6 @@ function fromSettings(s: Settings) {
   form.accountGapMax = s.gapBetweenAccountsMs[1]
   form.typingCpsMin = s.typingCps[0]
   form.typingCpsMax = s.typingCps[1]
-  form.maxScrollAttempts = s.maxScrollAttempts
   form.shuffleFriends = s.shuffleFriends
   form.dailyCapPerAccount = s.limits.dailyCapPerAccount
   form.retryPerFriend = s.limits.retryPerFriend
@@ -198,9 +195,6 @@ onMounted(load)
           </label>
           <label class="component-field">连续失败中止阈值
             <input v-model.number="form.consecutiveFailAbort" class="console-number" type="number" min="1" />
-          </label>
-          <label class="component-field">会话列表最大滚动尝试
-            <input v-model.number="form.maxScrollAttempts" class="console-number" type="number" min="1" />
           </label>
         </div>
       </div>

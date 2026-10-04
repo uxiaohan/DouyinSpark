@@ -40,9 +40,3 @@ export function shuffle<T>(arr: readonly T[]): T[] {
   }
   return out
 }
-
-/** 取最多 n 条；dedupe=true 时先去重 */
-export function sampleN<T>(arr: readonly T[], n: number, dedupe: boolean): T[] {
-  const base = dedupe ? [...new Set(arr)] : [...arr]
-  return shuffle(base).slice(0, Math.max(0, n))
-}

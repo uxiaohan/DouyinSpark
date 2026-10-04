@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test"
-import { randInt, randMs, sampleN, shuffle } from "./util"
+import { randInt, randMs, shuffle } from "./util"
 
 test("randInt 在闭区间内", () => {
   for (let i = 0; i < 200; i++) {
@@ -17,12 +17,6 @@ test("randMs 在区间内且整数", () => {
     expect(v).toBeGreaterThanOrEqual(lo)
     expect(v).toBeLessThanOrEqual(hi)
   }
-})
-
-test("sampleN 去重且不超长度", () => {
-  const a = [1, 2, 3]
-  expect(sampleN(a, 5, true).length).toBe(3)
-  expect(new Set(sampleN(a, 3, true)).size).toBe(3)
 })
 
 test("shuffle 不丢元素", () => {

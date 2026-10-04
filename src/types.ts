@@ -70,7 +70,6 @@ export type RuntimeSettings = {
   gapBetweenFriendsMs: [number, number]
   gapBetweenAccountsMs: [number, number]
   typingCps: [number, number]
-  maxScrollAttempts: number
   pushdeerKey: string | null
   notifyOnRun: boolean
   notifyOnAbort: boolean
