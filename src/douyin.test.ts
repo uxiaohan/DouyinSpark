@@ -178,6 +178,11 @@ class FakePage {
   draftFn: ((p: FakePage) => string | null) | null = null
   /** 逐字插入是否真的落进草稿（false = 模拟输入框不接收） */
   insertWritesDraft = true
+  /** evaluate 抛异常（模拟页面结构变了 / NodeList 用法错误这类运行时炸点） */
+  evaluateThrows = false
+  /** 前几次 evaluate 照常放行：markSeenOutgoing 是第 1 次，之后才是确认链 */
+  evaluateThrowsAfter = 1
+  private evaluateCalls = 0
 
   asPage(): Page {
     return this as unknown as Page
@@ -291,6 +296,10 @@ class FakePage {
   }
 
   async evaluate(fn: (arg: unknown) => unknown, arg: unknown): Promise<unknown> {
+    this.evaluateCalls += 1
+    if (this.evaluateThrows && this.evaluateCalls > this.evaluateThrowsAfter) {
+      throw new TypeError("g.document.querySelectorAll(...).filter is not a function")
+    }
     const g = globalThis as { document?: unknown }
     const prev = g.document
     g.document = {
@@ -533,6 +542,31 @@ test("文字没落进输入框：直接抛错，不硬发", async () => {
   page.insertWritesDraft = false
   page.draftValue = ""
   await expect(sendTextMessage(page.asPage(), MESSAGE, [200, 200], FAST)).rejects.toThrow("文字未能写入输入框")
+})
+
+// 回归（2026-10-04 真机 run#3，3 好友每个被发 3 遍）：确认链 evaluate 抛
+// TypeError（NodeList 没有 filter），而 triggerSend 已经执行、消息已经出去。
+// 老代码让异常直接往上抛 → handleFriend 记 failed → 重试再发一遍。
+// 现在异常必须降级成 uncertain，由草稿裁定，不能再触发重发。
+test("确认链抛异常且草稿已清：按已发送计数，不判失败（否则重试会重发）", async () => {
+  const page = sendPage()
+  page.newBubble = bubbleScript(["clean"])
+  page.evaluateThrows = true
+  page.draftFn = (p) => (p.triggered ? "" : MESSAGE)
+  const r = await sendTextMessage(page.asPage(), MESSAGE, [200, 200], FAST)
+  if (r.ok !== true) throw new Error(`预期按已发送计数，实际: ${JSON.stringify(r)}`)
+  expect(r.uncertain).toContain("按已发送计数")
+})
+
+test("确认链抛异常但草稿仍在：判 failed（消息确实没出去，该重试）", async () => {
+  const page = sendPage()
+  page.newBubble = bubbleScript(["clean"])
+  page.evaluateThrows = true
+  page.draftValue = MESSAGE // 草稿还在 = 没发出去
+  expect(await sendTextMessage(page.asPage(), MESSAGE, [200, 200], FAST)).toEqual({
+    ok: false,
+    reason: `发送未确认: ${MESSAGE}`,
+  })
 })
 
 /* ------------------------------------------------------------------ *

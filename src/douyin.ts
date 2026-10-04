@@ -327,13 +327,31 @@ export async function sendTextMessage(
 
   await markSeenOutgoing(page, text)
   await triggerSend(page)
-  const verdict = await confirmSent(page, text, timings)
+  // 确认链自己崩了 ≠ 没发出去。triggerSend 已经执行，消息很可能已经到对方
+  // 手里；当成 failed 会让 handleFriend 重试，把同一条再发一遍——用户真机
+  // 实测过：3 好友 × 3 次尝试 = 9 条。所以这里一律降级成 uncertain，
+  // 交给下面的草稿兜底裁定，绝不因为"我看不见"就判定"没发"。
+  let verdict: SendVerdict
+  try {
+    verdict = await confirmSent(page, text, timings)
+  } catch (err) {
+    log.warn("发送确认链异常，按不确定处理", { err: String(err) })
+    verdict = "uncertain"
+  }
   if (verdict === "sent") return { ok: true }
   if (verdict === "failed") return { ok: false, reason: `发送失败: ${text}` }
   // 终态超时没等到定论：草稿已清大概率是发出去了（按已发送计数但留痕，
   // run_items 的 reason 里能看到是哪条）；草稿还在就是没出去——判失败让
   // handleFriend 的重试接手（重试重新开会话、重挑文案，不会重复发送同一条）。
-  const left = await readDraft(page)
+  let left: string | null = null
+  try {
+    left = await readDraft(page)
+  } catch (err) {
+    // 草稿也读不了：同样不知道发没发。真实发送不可撤回，宁可少发不重发，
+    // 按已发送计数并把异常写进 reason，让人能事后查。
+    log.warn("草稿读取失败，按已发送计数", { err: String(err) })
+    return { ok: true, uncertain: `发送状态与草稿均无法确认，按已发送计数: ${text}（${String(err).slice(0, 80)}）` }
+  }
   if (left !== null && left.trim() !== "") return { ok: false, reason: `发送未确认: ${text}` }
   return { ok: true, uncertain: `发送状态不确定但草稿已清，按已发送计数: ${text}` }
 }

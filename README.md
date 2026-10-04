@@ -195,6 +195,12 @@ spinner，且新气泡必须干净度过整个初始观察窗 + spinner 消失�
 终态超时没定论 → 看草稿：草稿已清按已发送计数（reason 里留痕），草稿仍在判
 `failed` 让重试接手（重试会重开会话、重挑文案，不会把同一条再发一遍）。
 
+**`retryPerFriend` 是重试上限，不是发送条数**：条数只看 `perFriendMessages`。
+每个好友最多发 `perFriendMessages × (retryPerFriend + 1)` 条，只有判定
+`failed` 时才会重试。确认链如果自己抛异常（页面结构变了、DOM API 用错），
+一律降级成 `uncertain` 走草稿兜底而不是判 `failed`——发送那一步已经执行了，
+判失败会让重试把同一条再发一遍（2026-10-04 真机实测踩过：3 好友 × 3 次）。
+
 ### 关于调度
 
 每天在 `[schedule.start, schedule.end]` 这个本地时间窗口内取一个**随机时刻**跑一次；
