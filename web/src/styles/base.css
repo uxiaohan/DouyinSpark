@@ -157,7 +157,12 @@ button:disabled { cursor: not-allowed; }
 @keyframes orbit-node { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(94px, 40px); } }
 @keyframes live-ring { 0% { opacity: .7; transform: scale(.5); } 100% { opacity: 0; transform: scale(1.5); } }
 @keyframes scan-chart { 0%, 8% { left: 2%; opacity: 0; } 18% { opacity: 1; } 72% { opacity: .8; } 84%, 100% { left: 98%; opacity: 0; } }
-@keyframes panel-detail-in { from { opacity: 0; translate: 0 4px; } }
+/* 只动 opacity：它服务的是弹窗/抽屉直接子项的错峰入场，而 .showcase-dialog 本身是
+   overflow-y:auto 的滚动容器。以前带 translate: 0 4px 的下滑，子项底边（尤其吸底的
+   footer）会被顶出容器内边距底边，Chrome 在动画期间算出几 px 的瞬时滚动溢出，
+   滚动条随动画出现、动画结束又消失——用户看到的就是"弹窗打开时滚动条闪一下"。
+   几何变换（translate/scale/rotate）一律不进滚动容器的子项入场动画 */
+@keyframes panel-detail-in { from { opacity: 0 } }
 
 @media (prefers-reduced-motion: reduce) {
   .spotlight-surface::before, .glare-surface::after { display: none; }
