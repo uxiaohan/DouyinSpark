@@ -144,12 +144,12 @@ test("requestStop 后好友标记 skipped 且不再重试", async () => {
   expect(calls).toBe(0)
 })
 
-test("skip（未找到会话）不触发重试也不计连续失败", async () => {
+test("skip（未找到好友会话）不触发重试也不计连续失败", async () => {
   const s = state()
   let calls = 0
   const fr = await handleFriend(friend(1, "张三"), s, async () => {
     calls += 1
-    return { status: "skipped" as const, messages: 0, reason: "未找到会话" }
+    return { status: "skipped" as const, messages: 0, reason: "未找到好友会话" }
   })
   expect(fr.status).toBe("skipped")
   expect(calls).toBe(1)

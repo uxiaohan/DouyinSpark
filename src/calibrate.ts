@@ -1,11 +1,11 @@
 ﻿/**
  * 校准探针：bun run calibrate
- * 用首个启用账号打开抖音，dump 候选按钮/可编辑元素与各候选选择器的命中数，
+ * 用首个启用账号打开抖音专用聊天页（/chat），dump 各候选选择器的命中数，
  * 截图落到 logs/calibrate.png，据此回填 src/selectors.ts。
  */
 import { mkdirSync } from "node:fs"
 import { closeAllBrowsers, openAccountPage } from "./browser"
-import { detectBlocked, ensureLoggedIn } from "./douyin"
+import { detectBlocked, openChatPage } from "./douyin"
 import { log } from "./logger"
 import { listAccounts } from "./repo"
 import { SEL } from "./selectors"
@@ -18,25 +18,14 @@ if (!account) {
 
 const { page } = await openAccountPage(account)
 try {
-  const loggedIn = await ensureLoggedIn(page)
-  log.info("calibrate: 登录状态", { loggedIn, url: page.url(), alias: account.alias })
+  const chat = await openChatPage(page)
+  log.info("calibrate: 聊天页状态", { chat, alias: account.alias })
+  if (!chat.ok) {
+    console.error("聊天页未就绪（登录失效/风控/页面未渲染），终止校准")
+    process.exit(1)
+  }
   const blocked = await detectBlocked(page)
   if (blocked) log.warn("calibrate: 命中风控/验证码", { blocked })
-
-  // 进入消息页，dump 更有价值
-  const entry = page.getByText(new RegExp(SEL.messageEntryText.join("|"))).first()
-  try {
-    await entry.click({ timeout: 5000 })
-    await page.waitForTimeout(1500)
-  } catch {
-    log.warn("calibrate: 未能点击「消息」入口")
-  }
-
-  const buttons = (await page.locator("button").allInnerTexts()).slice(0, 60)
-  console.log("--- buttons ---")
-  console.log(JSON.stringify(buttons, null, 0))
-  const editables = await page.locator("[contenteditable='true'], textarea, input").count()
-  console.log("--- editables/inputs ---", editables)
 
   console.log("--- SEL 命中数 ---")
   for (const [field, value] of Object.entries(SEL)) {
@@ -62,4 +51,3 @@ try {
 } finally {
   await closeAllBrowsers()
 }
-

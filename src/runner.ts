@@ -2,7 +2,7 @@ import type { Page } from "playwright"
 import { closeAllBrowsers, openAccountPage } from "./browser"
 import { loadRunConfig } from "./config"
 import { nowISO } from "./db"
-import { detectBlocked, ensureLoggedIn, openConversation, sendCurrentDraft, typeMessage } from "./douyin"
+import { detectBlocked, openChatPage, openFriendChat, sendTextMessage } from "./douyin"
 import { log } from "./logger"
 import { notifyRun } from "./notify"
 import { addRunItem, countTodaySuccess, createRun, finishRun, touchAccountRun } from "./repo"
@@ -184,8 +184,8 @@ async function driveFriend(
   capLeft: () => number,
   used: Set<string>,
 ): Promise<FriendOutcome> {
-  const opened = await openConversation(page, friend.name, s.maxScrollAttempts)
-  if (!opened) return { status: "skipped", messages: 0, reason: "未找到会话" }
+  const opened = await openFriendChat(page, friend.name)
+  if (!opened.ok) return { status: "skipped", messages: 0, reason: opened.reason }
 
   const blocked = await detectBlocked(page)
   if (blocked) return { status: "failed", messages: 0, reason: `风控: ${blocked}` }
@@ -201,15 +201,24 @@ async function driveFriend(
   if (texts.length === 0) return { status: "skipped", messages: 0, reason: "无可用文案" }
 
   let sent = 0
+  // 发送状态不确定但按已发送计数的留痕：成功也有非空 reason，落 run_items 可查
+  const notes: string[] = []
   for (const text of texts) {
     const now = await detectBlocked(page)
-    if (now) return { status: sent > 0 ? "success" : "failed", messages: sent, reason: `风控: ${now}` }
-    await typeMessage(page, text, s.typingCps)
-    await sendCurrentDraft(page)
+    if (now) {
+      return {
+        status: sent > 0 ? "success" : "failed",
+        messages: sent,
+        reason: [`风控: ${now}`, ...notes].join("；"),
+      }
+    }
+    const r = await sendTextMessage(page, text, s.typingCps)
+    if (!r.ok) return { status: "failed", messages: sent, reason: [r.reason, ...notes].join("；") }
+    if (r.uncertain) notes.push(r.uncertain)
     sent += 1
     await sleep(randMs(s.gapBetweenMessagesMs))
   }
-  return { status: "success", messages: sent, reason: null }
+  return { status: "success", messages: sent, reason: notes.length > 0 ? notes.join("；") : null }
 }
 
 async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountResult> {
@@ -238,9 +247,25 @@ async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountR
   }
   const { page, context } = opened
   try {
-    if (!(await ensureLoggedIn(page))) {
-      log.warn("账号未登录/cookie 失效", { alias: account.alias })
-      return cookieExpiredResult(rt, "cookie 失效/未登录")
+    const chat = await openChatPage(page)
+    if (!chat.ok) {
+      if (chat.kind === "risk") {
+        log.warn("私信页命中风控，停止该账号", { alias: account.alias, blocked: chat.blocked })
+        state.aborted = true
+        return {
+          ...base,
+          aborted: true,
+          reason: `风控: ${chat.blocked}`,
+          friends: skippedAll(rt, `风控: ${chat.blocked}`).friends,
+        }
+      }
+      if (chat.kind === "login") {
+        log.warn("账号未登录/cookie 失效", { alias: account.alias })
+        return cookieExpiredResult(rt, "cookie 失效/未登录")
+      }
+      // 页面开了但搜索框始终没来：慢渲染，不是登录问题（参考项目同款区分）
+      log.warn("私信页面未就绪，跳过该账号", { alias: account.alias })
+      return skippedAll(rt, "私信页面未就绪")
     }
     const blocked = await detectBlocked(page)
     if (blocked) {
