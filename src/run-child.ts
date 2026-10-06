@@ -1,4 +1,5 @@
 import { resolve } from "node:path"
+import { evictRuntimeCache } from "./cache-evict"
 import { log } from "./logger"
 
 /**
@@ -61,6 +62,10 @@ export async function runInChild(trigger: string, spawner: Spawner = defaultSpaw
     if (code !== 0) throw new Error(`运行子进程退出码 ${code}`)
   } finally {
     current = null
+    // 子进程退出后把运行期间读进页缓存的大文件（bun 本体、chromium 及其库）驱逐：
+    // 容器 `docker stats` 占用立刻回落到常驻水位，小机器不被缓存长期占着。
+    // 没装 vmtouch 的环境自动跳过；驱逐失败只 warn，不带进运行结果
+    await evictRuntimeCache()
   }
 }
 

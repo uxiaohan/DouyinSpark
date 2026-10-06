@@ -31,7 +31,10 @@ ENV NODE_ENV=production \
     DOUYIN_CONTAINER=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl tini tzdata \
+    # vmtouch：运行结束后把 bun 本体和 /ms-playwright 下 chromium 的文件页从页缓存
+    # 驱逐掉（见 src/cache-evict.ts），容器占用在运行间隙回落到常驻水位。
+    # 本地开发机没有它，evictRuntimeCache 会自动跳过，不影响任何行为
+    && apt-get install -y --no-install-recommends ca-certificates curl tini tzdata vmtouch \
     && rm -rf /var/lib/apt/lists/*
 # 归属在 COPY 时直接落 bun:bun：若留到后面对 /app 做 chown -R，overlayfs 会把整个 node_modules
 # 复制上进层，镜像平白多出一份完整依赖的体积。运行时要写的只有 data（sqlite）和 logs（calibrate 截图）

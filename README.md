@@ -1,84 +1,48 @@
 # DouyinSpark 续火花
 
-本地自动化"抖音续火花"：每天在一个随机时间窗口内，用每个账号自己的 cookie 登录抖音网页版，
-给该账号的火花好友发随机文案，配一个 Vue3 网页控制台做配置和查看。
-
-运行引擎是 Bun + Playwright，控制台是 Hono + Vue3，数据存在本地 SQLite（`bun:sqlite`，无外部数据库）。
-
----
-
-## 亮点
-
-- **常驻内存约 20MB，不越用越胖**：控制台（含每日调度）自己从不加载 Playwright——实测它
-  一旦 import 就在 Bun 的 ESM 缓存里永久常驻 +65MB（强制 GC 收不回）。所以每批运行都丢进
-  独立子进程，父子只传退出码和信号。真机实测（run#5）：父进程 18MB 起步，整批 40.7 秒
-  跑完 21MB，浏览器整个生命周期里父进程 RSS 纹丝不动。
-- **运行结束占用即清零**：子进程跑完就退出，临时占用的内存连进程一起归还系统，控制台回到
-  常驻水位。不存在"越用越胖、只有重启才回落"的问题。
-- **停机不丢半条消息**：退出信号（`docker stop` / Ctrl+C）先落父进程，再转发给运行中的
-  子进程，它在当前好友边界收尾后才退出；半条消息和未收尾的运行记录不会留在库里。
-
----
+本地自动化抖音续火花：每天在随机时间窗口内，用每个账号自己的 cookie 登录抖音网页版，给该账号的火花好友发随机文案。引擎 Bun + Playwright，控制台 Hono + Vue3，数据存本地 SQLite（`bun:sqlite`，无外部数据库）。运行时依赖只有 `playwright`、`hono`、`@hono/bun`（dev：`@types/bun`），前端另用 `vue` + `vue-router`。
 
 ## 环境要求
 
-| 项 | 版本 | 说明 |
-|---|---|---|
-| Bun | 1.4.2 | 项目按这个版本开发和测试 |
-| Chrome | 任意较新版本 | **必须本机安装**。运行用 `channel: "chrome"` 起真实 Chrome，不依赖 Playwright 自带的 chromium |
-| Node | ≥ 18 | 前端类型检查必须用它：`vue-tsc` 靠补丁 `fs.readFileSync` 给 tsc 注入 Vue 插件，只在 Node 运行时生效。Bun 运行时下补丁失效，所有 `.vue` 导入会报 TS2307（后端和 `vite build` 仍由 Bun 驱动） |
+| 项 | 要求 |
+|---|---|
+| Bun | 1.4.2，按此版本开发和测试 |
+| Chrome | **本机必须安装**。运行时 `channel: "chrome"` 起真实 Chrome，不用 Playwright 自带 chromium |
+| Node | ≥18，仅前端类型检查需要：`vue-tsc` 靠补丁 `fs.readFileSync` 给 tsc 注入 Vue 插件，只在 Node 下生效；Bun 下补丁失效，所有 `.vue` 导入会报 TS2307（后端和 `vite build` 仍由 Bun 驱动） |
 
-依赖只有四个：`playwright`、`hono`、`@hono/bun`，以及 dev 依赖 `@types/bun`。前端额外用 `vue` + `vue-router`。
-
-用 Docker 部署则本机不需要 Bun、Node 和 Chrome，见下文「Docker 部署」。
+Docker 部署则本机不需要 Bun / Node / Chrome。
 
 ```bash
 bun install
 ```
 
----
-
 ## 快速开始
 
 ```bash
-# 启动控制台（默认 0.0.0.0:8787）。全新库首启会自动写入示例数据，
-# 不需要（也没有）单独的初始化步骤；想手动补齐再跑 bun run seed
-bun run web
+bun run web   # 控制台默认 0.0.0.0:8787，同时进入每日调度循环
 ```
 
-浏览器打开 `http://127.0.0.1:8787`（本机访问用 127.0.0.1 即可）。
+浏览器开 `http://127.0.0.1:8787`。全新库首启自动写示例数据，没有单独初始化步骤（`bun run seed` 可手动补写，幂等）。
 
-**首次进入**：数据库里没有管理口令时，打开控制台会进入「初始化控制台」引导页——设置一个管理口令（至少 6 位、二次确认）后自动进入。口令只以 bcrypt 哈希存在本机数据库，忘记无法找回，只能删 `data/app.db` 重新初始化。
-之后每次登录都要用这个口令。会话 cookie 24 小时有效，HttpOnly。同一 IP 一分钟内连续输错 5 次会被限流。
+**首进控制台**：库里有管理口令要求时先走初始化引导——设一个 ≥6 位口令（二次确认），只以 bcrypt 哈希存在本机库，**忘记无法找回，只能删 `data/app.db` 重新初始化**。之后每次登录都用它；会话 cookie 24 小时有效、HttpOnly；同 IP 一分钟输错 5 次触发限流。
 
-### 粘贴自己的 cookie
+### 获取 cookie（Cookie-Editor 浏览器插件）
 
-1. 浏览器登录抖音网页版（`https://www.douyin.com/`）。
-2. 用 Cookie-Editor 之类的扩展导出当前域名的 cookie，得到 JSON 数组。
-3. 控制台「账号」页 → 填别名 → 粘贴那段 JSON → 保存。
+1. 装好 Cookie-Editor 浏览器插件。
+2. 登录抖音网页版 `https://www.douyin.com/`。
+3. 在 douyin.com 域名下点插件 Export → JSON，复制导出的 cookie 数组。
+4. 控制台「账号」页 → 填别名 → 粘贴 → 保存。
 
 注意：
+
 - cookie **只写入、不回显**，之后在界面上看到的是掩码。
 - 域名必须含 `douyin`，否则该条 cookie 会被跳过。
 - 保存在本地 `data/app.db`，**不会**进 git（`data/` 已在 `.gitignore`）。
 - cookie 失效后运行不会崩：该账号的全部好友会被标记 `skipped (cookie 失效)`，其他账号照常跑。
 
-### 加好友和文案
+**好友 / 文案**：好友按账号添加，名字必须与抖音会话列表显示的备注/昵称**精确匹配**（空白折叠：NBSP、全角空格、普通空格都识别，写入时折叠成普通空格；空格有无算不同名字，"张 三" ≠ "张三"），同账号不可重复（重名 409）。文案页维护随机文案池，可按账号分开。
 
-- 「好友」页按账号添加，名字必须是抖音会话列表里显示的备注/昵称，**精确匹配**（空白折叠后：NBSP、全角空格、普通空格都识别，写入时会折叠成普通空格；但空格的有无算不同名字，"张 三" ≠ "张三"）。同一账号下不可重复添加，重名返回 409。
-- 「文案」页维护随机文案池，可以按账号分开。
-
-### 第一次试跑
-
-正式运行：会真打开浏览器、真登录、真点进会话并**真实发送**。在终端手动跑一次：
-
-```bash
-bun run now
-```
-
-实测一次真发（单好友、单条）从启动到跑完约 27 秒。
-
----
+**试跑**：`bun run now` 会真开浏览器、真登录、真发送。实测单好友单条约 27 秒。
 
 ## 命令
 
@@ -106,190 +70,76 @@ bun run now
 | `PLAYWRIGHT` | 空 | 设成 `1` 才跑需要真浏览器的单测 |
 | `DOUYIN_CONTAINER` | 空 | 设成 `1` 时浏览器加 `--no-sandbox` 并跳过系统 Chrome 探测（Docker 镜像默认注入） |
 
----
-
 ## Docker 部署
 
-整套跑在容器里，不依赖本机的 Bun / Chrome。两个 compose 文件分工：
+复制下面内容存成 `docker-compose.yml`，`docker compose up -d` 直接跑（用 GHCR 已发布镜像，本机构建都不需要）：
 
-| 文件 | 用途 |
-|---|---|
-| `docker-compose.yml` | **直接运行** GHCR 上已发布的镜像（`ghcr.io/uxiaohan/douyinspark`），不在本机构建 |
-| `docker-build-compose.yml` | 从当前源码**本地构建**再运行，改代码自测用 |
-
-### 运行发布的镜像
-
-```bash
-# 首次 / 升级都是这两条
-docker compose pull
-docker compose up -d
-
-# 指定版本：DOUYIN_TAG=sha-1a2b3c4 docker compose up -d
-# 看日志，确认出现 "scheduler: 下次运行" 即调度循环就绪
-docker compose logs -f
+```yaml
+services:
+  douyinspark:
+    image: ${DOUYIN_IMAGE:-ghcr.io/uxiaohan/douyinspark}:${DOUYIN_TAG:-latest}
+    container_name: douyinspark
+    restart: unless-stopped
+    # 优雅停机要在当前好友边界收尾（最多 2 分钟），宽限必须比它长，
+    # 否则 docker stop 的默认 10s 宽限会 SIGKILL 掉正在收尾的运行
+    stop_grace_period: 2m10s
+    # Chromium 默认只用 64MB /dev/shm，页面一复杂就崩
+    shm_size: "1gb"
+    ports:
+      - "${DOUYIN_PORT:-8787}:8787"
+    environment:
+      TZ: "${DOUYIN_TZ:-Asia/Shanghai}"
+    volumes:
+      - ./data:/app/data
+    # 日志不设上限会把磁盘吃光
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 ```
 
-启动后访问 `http://<机器IP>:8787`。首次进入同本地：走「初始化控制台」引导设置管理口令。
-
-GHCR 的 package 默认**私有**，拉不动就先登录（用有 `read:packages` 权限的 PAT）：
+起来后访问 `http://<机器IP>:8787`，首进走初始化引导设管理口令。
 
 ```bash
-docker login ghcr.io
+docker compose pull && docker compose up -d     # 升级到最新镜像
 ```
 
-#### 国内加速（ghcr.nju.edu.cn）
+GHCR 的 package 默认私有，拉不动先 `docker login ghcr.io`（需要 `read:packages` 权限的 PAT）。
 
-ghcr.io 国内直连不稳，可用南京大学的 GHCR 代理 `ghcr.nju.edu.cn`——镜像路径与 ghcr.io 相同，只换主机名：
+**国内加速**：ghcr.io 直连不稳，换成南京大学的 GHCR 代理 `ghcr.nju.edu.cn`（镜像路径相同，只换主机名）：
 
 ```bash
-# 直接拉
 docker pull ghcr.nju.edu.cn/uxiaohan/douyinspark:latest
-
-# 或让 compose 整体走代理（镜像名可覆盖）
+# 或让 compose 整体走代理：
 DOUYIN_IMAGE=ghcr.nju.edu.cn/uxiaohan/douyinspark docker compose up -d
 ```
 
-注意：代理只同步**公开**的 package。私有包要么先去 package 页面 Settings 改成 public，
-否则仍然走 `docker login ghcr.io` + 有 `read:packages` 的 PAT 从官方源拉。
+代理只同步**公开** package：私有包要么去 package 页面 Settings 改成 public，否则仍走 `docker login ghcr.io` + 有 `read:packages` 的 PAT 从官方源拉。
 
-### 本地构建运行
+**改代码自测**：用仓库里的 `docker-build-compose.yml` 从当前源码本地构建再运行（一样挂 `./data`，别和上面同时跑，SQLite 会撞锁）：
 
 ```bash
 docker compose -f docker-build-compose.yml up -d --build
 ```
 
-### 发布镜像（GitHub Actions）
-
-仓库 **Actions → Publish Docker image → Run workflow**，无需填参数，点一下就跑。
-触发后基于**推送时的那个 commit**：amd64 在标准 runner、arm64 在 GitHub 免费 arm runner
-（public 仓库免费用，不走 QEMU 模拟，全程约 10 分钟）上**原生并行构建**，合成多架构 manifest
-推到 `ghcr.io/uxiaohan/douyinspark`，每次固定打两个标签：`sha-<7位短哈希>`（不可变，按 commit
-回滚用）和 `latest`（始终指向最新一次构建）。任一侧构建失败就不打新标签，线上镜像保持原样。
-所以改完代码先 push，再触发工作流。
+**发布镜像**：仓库 Actions → Publish Docker image → Run workflow，无需参数。基于**推送时的 commit**：amd64 在标准 runner、arm64 在 GitHub 免费 arm runner（不走 QEMU，全程约 10 分钟）上原生并行构建，合成多架构 manifest 推到 `ghcr.io/uxiaohan/douyinspark`，固定打两个标签：`sha-<7位短哈希>`（不可变，按 commit 回滚）和 `latest`；任一侧失败不打新标签，线上镜像保持原样。所以改完代码先 push 再触发。
 
 | 项 | 说明 |
 |---|---|
-| 数据 | 绑定挂载 `./data`（compose 文件同级的 data 目录）到容器 `/app/data`。app.db 就躺在那里，看得见摸得着；`docker compose down` 不碰它，想删数据只能手动删目录 |
-| 时区 | 固定 `TZ=Asia/Shanghai`。调度窗口按容器本地时间算，改 TZ 会让每天运行点整体漂移 |
-| 手动跑一批 | `docker compose exec douyinspark bun run now` |
-| 迁移旧数据 | 把本机 `data/app.db`（连同 `-wal` / `-shm`，如果有）复制到 compose 同级的 `./data/`，再 `docker compose up -d`。**同一台机器上别让本机控制台和容器同时跑**：两边共用同一个 SQLite 库，WAL 跨进程锁在 Windows 上会报 `database is locked` |
-| 绑定挂载权限 | 容器内运行用户是 uid/gid 1000（bun）。Linux 宿主先 `sudo chown -R 1000:1000 ./data`；Windows Docker Desktop 首次挂 D 盘需在 Settings → Resources → File Sharing 里放行 |
+| 数据 | 绑定挂载 `./data`（compose 同级的 data 目录）到容器 `/app/data`，app.db 就在那里；`docker compose down` 不碰它，删数据只能手动删目录 |
+| 时区 | 固定 `TZ=Asia/Shanghai`（compose 里可改）。调度窗口按容器本地时间算，改 TZ 会让每天运行点整体漂移 |
+| 迁移旧数据 | 把本机 `data/app.db`（连同 `-wal` / `-shm`）复制到 compose 同级的 `./data/` 再 `up -d`。**同一台机器上别让本机控制台和容器同时跑**：共用同一个 SQLite 库，WAL 跨进程锁在 Windows 上会报 `database is locked` |
+| 绑定挂载权限 | 容器内运行用户是 uid/gid 1000（bun）；Linux 宿主先 `sudo chown -R 1000:1000 ./data`；Windows Docker Desktop 首次挂 D 盘需在 Settings → Resources → File Sharing 里放行 |
 | 换端口 | `DOUYIN_PORT=9000 docker compose up -d` |
-| 停机 | `docker stop` 发 SIGTERM，父进程转发给运行子进程，等当前好友边界收尾再退出（优雅停机，最多 2 分钟）；compose 宽限 2m10s，容器内再次收到信号才强制退 |
-| 日志 | json-file 滚动：单文件上限 10MB，保留 3 份 |
 
-和本机跑的两点差异：
-
-1. 浏览器用镜像内置的 chromium，不是本机 Chrome。指纹与真实 Chrome 略有差异，首次建议先用单账号、单好友小范围观察一轮。
-2. `HEADFUL=1` 在容器里无意义（没有显示环境），容器内始终 headless。
-
----
-
-## 一轮运行是怎么跑的
-
-1. 读取配置，按账号顺序处理；同代理的账号共用一个浏览器实例，各自独立 context。
-2. 每个账号直接开抖音专用聊天页 `https://www.douyin.com/chat`（不再在首页点「消息」入口）：
-   搜索框就绪才算可用；命中风控 → 停该账号；出现登录文案 → cookie 失效；慢渲染 → 跳过该账号。
-3. 找好友以**搜索框为主**：按备注/昵称在搜索结果行里匹配（群聊容忍「名字(N)」人数后缀），
-   点「发消息」；搜索没找到再回会话列表直点兜底。两条路都要**聊天头部标题匹配**才算打开——
-   点击没抛错不算数。头部没确认上会分别记 `未找到好友会话` / `会话打开未确认`。
-4. 逐字输入文案（速度按 `typingCps` 随机抖动），先确认草稿里真有这段文字才发。
-5. 命中验证码/风控文案 → 该好友记 `failed`；连续失败达到 `consecutiveFailAbort` → 中止整批。
-6. 全部跑完按 `notifyOnRun` / `notifyOnAbort` 决定是否推 PushDeer，推送失败不影响运行结果。
-
-### 关于进程模型
-
-控制台进程（web-server，含每日调度）**不自己跑浏览器**：每次运行都 spawn 一个
-`bun index.ts --now --trigger <t>` 子进程，父子之间只传退出码和信号。
-原因是 playwright 一旦 import 就在 Bun 的 ESM 缓存里永久常驻（实测 +65MB，
-强制 GC 收不回），而控制台一天 23 小时都在空跑——不隔离的话长期占用会从
-15MB 涨到 80MB 且只有重启才回落。隔进子进程后，父进程从头到尾不 import
-playwright，跑完子进程退出，内存连进程一起归还。`bun run now` /
-`docker exec ... bun run now` 仍是进程内一次性执行（跑完即退，无所谓常驻），
-worker 子进程与手动跑的是同一份 `runOnce`，不会漂移出两套行为。
-
-`docker stop` 的 SIGTERM 先落到父进程：有子进程在跑就转发 SIGTERM 让它在当前
-好友边界收尾，父进程等它退出再退；compose 里 `stop_grace_period: 2m10s` 比
-程序内的 2 分钟 drain 宽限稍长，才轮得到超时后的 SIGKILL 兜底。容器内再次收到
-信号才强制退。
-
-### 关于发送方式
-
-优先点发送按钮，点不到才回退回车——`/chat` 页面上按钮是真实可点的
-（首页 overlay 下判定「没有发送按钮」是误判）。发送后**不认为气泡出现就是成功**：
-抖音先渲染气泡、后解析发送状态，所以确认链要盯这条气泡上的失败/重试标记和转圈
-spinner，且新气泡必须干净度过整个初始观察窗 + spinner 消失后的稳定窗口。
-
-三种结局分开处置：确定失败 → `failed` 交重试；确定成功 → `success`；
-终态超时没定论 → 看草稿：草稿已清按已发送计数（reason 里留痕），草稿仍在判
-`failed` 让重试接手（重试会重开会话、重挑文案，不会把同一条再发一遍）。
-
-**每个好友每轮固定只发 1 条**：消息条数旋钮已整个删掉（2026-10-05 用户口径，
-实测过"设了 1 条却发 3 条"——过去 `perFriendMessages` 是每次尝试随机 [1,N] 条、
-再叠 `retryPerFriend` 次尝试，真人好友被反复打扰）。`retryPerFriend` 是重试上限
-不是发送条数，只有判定 `failed` 时才会重试。确认链如果自己抛异常（页面结构变了、
-DOM API 用错），一律降级成 `uncertain` 走草稿兜底而不是判 `failed`——发送那一步
-已经执行了，判失败会让重试把同一条再发一遍（2026-10-04 真机实测踩过：3 好友 × 3 次）。
-
-### 关于调度
-
-每天在 `[schedule.start, schedule.end]` 这个本地时间窗口内取一个**随机时刻**跑一次；
-当前已晚于窗口结束时间就顺延到次日。开始与结束永远是**同一天**的两个时刻（结束早于开始的
-区间在控制台和后端都会被拒绝）。开始 = 结束（零长窗口）不随机：每天到点就跑。
-`/api/next-run` 可以看下次预计运行时间。
-
-2026-10-04 翻车记录：旧实现用 `end <= start` 判跨零点，用户设的 01:04–01:04 被当成跨零点、
-`end` 推到次日，零长窗口悄悄变成 24 小时窗口，"下次运行"随机排到约 9 小时后。
-已改为严格小于，并补了零长窗口的回归用例。
-
-跑完一批后不会在同一个窗口内再取点：本轮窗口的结束时刻会作为 `after`
-由循环带进下一轮取点。这一条 2026-10-03 之前在真机上翻过车——同一窗口连跑两轮，
-`runs` 表里 run 13/14、run 15/16 各相差几十秒；已补一个用假时钟驱动真实循环的
-回归用例，但"跨天只跑一轮"的真机表现要等下一个窗口才验证得了。
-
-### 关于风控与降级
-
-- 选择器 drift 不会静默失败：会打 `warn` 日志，把该好友记 `skipped (未找到会话)`。
-- 风控检测扫的是整页 body 文本，所以候选文案**不能**收"请稍后再试"这类日常客套
-  （好友聊天记录里出现这句话会误判成风控，把好友记 failed 并累计连续失败）。
-- PushDeer 推送失败只记 warning，绝不让运行崩。
-- `Ctrl+C` 一次：运行会在当前好友的边界停下；再按一次才强退。
-
----
-
-## 已验证 / 未验证
-
-下面这些是拿用户真实 cookie 在真机上跑过的，其余都没验证过，用之前请自己确认。
-
-**已验证**
-- `/chat` 专用聊天页的只读探针：搜索框、会话项、搜索结果行、聊天头部、输入框、
-  发送按钮、消息列表与本人气泡的选择器均用真实 cookie 校准过；聊天面板开着时
-  点第二个会话项，命中测试最上层就是会话行本身（无弹层遮挡）。
-- 搜索框找人：填名字 → 结果行匹配 → 点「发消息」→ 头部标题变成该好友、输入框就位。
-- 真发一条消息（旧链路）：消息确实出现在聊天记录里（时间戳"刚刚"），输入框无残留草稿。
-- 新链路真机全程成功一轮（run#4，2026-10-04）：`/chat` 打开 → 搜索找人 → 头部确认
-  → 逐字输入 → 草稿校验 → 点发送 → 终态确认，3 好友各 1 条全 success，75 秒跑完。
-- 子进程吊起的真机整批运行（run#5，2026-10-04）：经 `runInChild` 拉起 worker 子进程跑完整批，
-  3 好友各 1 条全 success、零重试，40.7 秒；进程树父子分离（父 bun → 子 bun → chrome），
-  父进程 RSS 18→21MB 不涨，子进程退出码 0 正确传回、无残留进程。
-- 控制台：登录/登出、设置、账号、好友、文案、运行记录的读写；静态托管与 SPA 回退。
-- 单测 149 项通过（另有 1 项需要真浏览器，默认跳过）。
-
-**未验证（重要）**
-- **新链路只在本机 Chrome headful 下成功跑过这一轮**：容器内置 chromium
-  （Docker 服务器）下的真机发送还没跑过；换环境真跑前先单账号、单好友小范围试。
-- 多账号同时跑、代理、好友间隔/账号间隔节奏：只跑过单账号单条。
-- Playwright 自带 chromium 的启动回退路径：CDN 装不上，只验证过本机 Chrome。
-- 跨零点的每日调度循环：只有 `computeNextRunAt` 的注入时间单测，没有真跑过跨天。
-- 风控命中后的降级路径：没法主动触发，没有复现过。
-- PushDeer 推送：没有配 key，没真发过。
+容器与本机的两点差异：浏览器用镜像内置 chromium（指纹与真实 Chrome 略有差异）；`HEADFUL=1` 无意义（无显示环境，容器内始终 headless）。
 
 ## 安全
 
 - `data/app.db` 里存着全部账号的 cookie 和管理口令哈希，**不要提交、不要外发**（`.gitignore` 已挡）。
 - 管理口令哈希用 bcrypt；登录失败才计限流次数，成功即清零。
-- 控制台默认监听 `0.0.0.0`。它会话持有你的 cookie 和一键运行开关，暴露在局域网里等于把这些交出去。
-  只在可信网络里用，或者设 `HOST=127.0.0.1`。
+- 控制台默认监听 `0.0.0.0`。它会话持有你的 cookie 和一键运行开关，暴露在局域网里等于把这些交出去。只在可信网络里用，或者设 `HOST=127.0.0.1`。
 
 ## 目录
 
@@ -303,6 +153,7 @@ src/
   douyin.ts          聊天页打开、好友匹配、输入、发送与终态确认
   runner.ts          运行主循环
   run-child.ts       调度运行丢进子进程（内存隔离）
+  cache-evict.ts     运行后驱逐页缓存（vmtouch，容器内存回落）
   scheduler.ts       每日随机窗口
   notify.ts          PushDeer
   selectors.ts       全部 DOM 选择器（漂移时改这里）
