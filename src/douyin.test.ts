@@ -150,6 +150,8 @@ class FakePage {
   gotoCalls = 0
   reloadCalls = 0
   lastUrl = ""
+  /** goto 之后的终态 URL：服务端 302 后与请求的 URL 不同，测试借此模拟重定向 */
+  currentUrl = ""
   clicks: Array<{ sel: string; force?: boolean }> = []
   keyPresses: string[] = []
   fills: Array<{ sel: string; value: string }> = []
@@ -290,6 +292,11 @@ class FakePage {
     this.lastUrl = url
   }
 
+  /** 终态 URL：登录域重定向靠它暴露（goto 的入参永远只有 SEL.chatUrl） */
+  url(): string {
+    return this.currentUrl || this.lastUrl
+  }
+
   async reload(): Promise<void> {
     this.reloadCalls += 1
     this.onReload?.()
@@ -344,10 +351,38 @@ test("出现登录文案：判 login 而不是 not_ready", async () => {
   expect(page.reloadCalls).toBe(0)
 })
 
+// 回归（2026-10-08 用户服务器实测）：一个账号 5 个好友全被「私信页面未就绪」
+// 跳过，手动重跑却正常。登录框渲染在 iframe 里时 body.innerText 取不到文案，
+// 文案派漏判，失效 cookie 被记成页面未就绪。URL 落在登录域是更硬的信号。
+test("URL 落在登录域：判 login，不等搜索框", async () => {
+  const page = new FakePage()
+  page.currentUrl = "https://login.douyin.com/?app_id=6383&next=https%3A%2F%2Fwww.douyin.com%2Fchat"
+  expect(await openChatPage(page.asPage())).toEqual({ ok: false, kind: "login" })
+})
+
 test("搜索框始终没来（reload 也没用）：not_ready，且只在第一次失败后 reload", async () => {
   const page = new FakePage()
   expect(await openChatPage(page.asPage())).toEqual({ ok: false, kind: "not_ready" })
   expect(page.reloadCalls).toBe(1)
+})
+
+// not_ready 的成因（登录页/风控页/代理错误页/SPA 没起来）返回值看不出区别，
+// 现场（URL + body 片段）必须落日志，否则事后无法归类。
+test("not_ready 时把现场快照落日志：URL 与 body 原文都在", async () => {
+  const page = new FakePage()
+  page.texts.set("body", "  页面不见了\n404  ")
+  const lines: string[] = []
+  const origin = console.error
+  console.error = (line: unknown) => lines.push(String(line))
+  try {
+    expect(await openChatPage(page.asPage())).toEqual({ ok: false, kind: "not_ready" })
+  } finally {
+    console.error = origin
+  }
+  const line = lines.find((l) => l.includes("三轮尝试后仍未就绪"))
+  expect(line).toBeDefined()
+  expect(line).toContain(`url=${SEL.chatUrl}`)
+  expect(line).toContain("页面不见了 404")
 })
 
 test("第一次没就绪、reload 后就绪：ok（慢渲染不当成登录失效）", async () => {

@@ -1,5 +1,6 @@
-import type { Page } from "playwright"
-import { closeAllBrowsers, openAccountPage } from "./browser"
+import type { BrowserContext, Page } from "playwright"
+import type { AccountPage } from "./browser"
+import { accountProxy, closeAccountBrowser, closeAllBrowsers, openAccountPage } from "./browser"
 import { loadRunConfig } from "./config"
 import { nowISO } from "./db"
 import { detectBlocked, openChatPage, openFriendChat, sendTextMessage } from "./douyin"
@@ -202,6 +203,77 @@ async function driveFriend(
   return { status: "success", messages: 1, reason: r.uncertain ?? null }
 }
 
+/**
+ * 打开账号的聊天页，拿到能开工的 page/context。
+ *
+ * openChatPage 内部只有页面级重试（3 次尝试 + 1 次 reload），治得了 SPA 慢
+ * 渲染，治不了进程级故障（渲染进程卡死、context 内存膨胀）——那类在同一
+ * Chromium 里 reload 多少次都还是老样子。所以 not_ready 时在这里关掉整个
+ * 浏览器再开一次（用户 2026-10-08 服务器实测：一个账号 5 个好友全被
+ * 「私信页面未就绪」跳过，手动重跑却完全正常，正是这类一次性故障）。
+ *
+ * 边界：
+ * - 只有 not_ready 值得重开。cookie 失效（含登录域落地）/风控重开无益，
+ *   前者 Cookie 相同再注入还是失效，后者多开一次只多一次风控面；
+ * - 有界：最多一次重开，且重开前判停止信号，不吃掉优雅停机的预算；
+ * - 每轮 openAccountPage 失败（无浏览器/网络不通）单独接住，不拖垮整批。
+ */
+const CHAT_REOPEN_ATTEMPTS = 2
+/** 重开前的停顿：给可能的抖音侧风控墙一点自愈时间，也避开"连续开关"的形态 */
+const CHAT_REOPEN_PAUSE_MS = 5000
+
+type ChatOpenResult =
+  | { ok: true; page: Page; context: BrowserContext }
+  | { ok: false; result: AccountResult }
+
+/** 关账号 context：失败只 warn 不带进结果——收尾失败不能盖过发送结论 */
+async function closeContext(context: BrowserContext): Promise<void> {
+  await context.close().catch((err: unknown) => log.warn("关闭账号上下文失败", { err: String(err) }))
+}
+
+async function openChatPageForAccount(rt: AccountRuntime, state: RunState, base: AccountResult): Promise<ChatOpenResult> {
+  const { account } = rt
+  for (let attempt = 1; attempt <= CHAT_REOPEN_ATTEMPTS; attempt++) {
+    let opened: AccountPage
+    try {
+      opened = await openAccountPage(account)
+    } catch (err) {
+      log.warn("打开账号页面失败，跳过该账号", { alias: account.alias, err: String(err) })
+      return { ok: false, result: skippedAll(rt, `打开页面失败: ${String(err).slice(0, 120)}`) }
+    }
+    const chat = await openChatPage(opened.page)
+    if (chat.ok) return { ok: true, page: opened.page, context: opened.context }
+    // 除成功外的所有出路都先收掉这一轮的 context，再决定账号结果
+    await closeContext(opened.context)
+    if (chat.kind === "risk") {
+      log.warn("私信页命中风控，停止该账号", { alias: account.alias, blocked: chat.blocked })
+      state.aborted = true
+      return {
+        ok: false,
+        result: {
+          ...base,
+          aborted: true,
+          reason: `风控: ${chat.blocked}`,
+          friends: skippedAll(rt, `风控: ${chat.blocked}`).friends,
+        },
+      }
+    }
+    if (chat.kind === "login") {
+      log.warn("账号未登录/cookie 失效", { alias: account.alias })
+      return { ok: false, result: cookieExpiredResult(rt, "cookie 失效/未登录") }
+    }
+    // not_ready：关掉浏览器重开一次（最后一次不关，留给上面的 closeContext 已收尾）
+    const canReopen = attempt < CHAT_REOPEN_ATTEMPTS && !state.shouldStop()
+    log.warn(canReopen ? "私信页面未就绪，关闭浏览器重开" : "私信页面未就绪，跳过该账号", { alias: account.alias, attempt })
+    if (!canReopen) return { ok: false, result: skippedAll(rt, "私信页面未就绪") }
+    // 摘掉浏览器实例，下一次 openAccountPage 才会真正重新 launch 而不是复用老进程
+    await closeAccountBrowser(accountProxy(account))
+    await sleep(CHAT_REOPEN_PAUSE_MS)
+  }
+  // CHAT_REOPEN_ATTEMPTS >= 1 时循环内必定 return，这里只为让类型收口
+  return { ok: false, result: skippedAll(rt, "私信页面未就绪") }
+}
+
 async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountResult> {
   const { account, friends, messages, fallbackMessages } = rt
   const s = state.settings
@@ -218,37 +290,12 @@ async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountR
   const capLeft = () => Math.max(0, cap - countTodaySuccess(account.id) - sentInRun.value)
   const sentInRun = { value: 0 }
 
-  let opened
+  const gate = await openChatPageForAccount(rt, state, base)
+  if (!gate.ok) return gate.result
+  const chatPage = gate.page
+  const context = gate.context
   try {
-    opened = await openAccountPage(account)
-  } catch (err) {
-    // 打不开页面（无浏览器/网络不通）不能拖垮整批
-    log.warn("打开账号页面失败，跳过该账号", { alias: account.alias, err: String(err) })
-    return skippedAll(rt, `打开页面失败: ${String(err).slice(0, 120)}`)
-  }
-  const { page, context } = opened
-  try {
-    const chat = await openChatPage(page)
-    if (!chat.ok) {
-      if (chat.kind === "risk") {
-        log.warn("私信页命中风控，停止该账号", { alias: account.alias, blocked: chat.blocked })
-        state.aborted = true
-        return {
-          ...base,
-          aborted: true,
-          reason: `风控: ${chat.blocked}`,
-          friends: skippedAll(rt, `风控: ${chat.blocked}`).friends,
-        }
-      }
-      if (chat.kind === "login") {
-        log.warn("账号未登录/cookie 失效", { alias: account.alias })
-        return cookieExpiredResult(rt, "cookie 失效/未登录")
-      }
-      // 页面开了但搜索框始终没来：慢渲染，不是登录问题（参考项目同款区分）
-      log.warn("私信页面未就绪，跳过该账号", { alias: account.alias })
-      return skippedAll(rt, "私信页面未就绪")
-    }
-    const blocked = await detectBlocked(page)
+    const blocked = await detectBlocked(chatPage)
     if (blocked) {
       log.warn("登录即命中风控，停止该账号", { alias: account.alias, blocked })
       state.aborted = true
@@ -268,7 +315,7 @@ async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountR
         result.friends.push({ friendId: friend.id, name: friend.name, status: "skipped", messages: 0, reason: "运行已停止" })
         continue
       }
-      const fr = await handleFriend(friend, state, (f) => driveFriend(page, f, messages, fallbackMessages, s, capLeft, usedTexts))
+      const fr = await handleFriend(friend, state, (f) => driveFriend(chatPage, f, messages, fallbackMessages, s, capLeft, usedTexts))
       result.friends.push(fr)
       if (fr.messages > 0) {
         sentInRun.value += fr.messages
@@ -278,7 +325,7 @@ async function runAccount(rt: AccountRuntime, state: RunState): Promise<AccountR
     touchAccountRun(account.id)
     return result
   } finally {
-    await context.close().catch((err: unknown) => log.warn("关闭账号上下文失败", { err: String(err) }))
+    await closeContext(context)
   }
 }
 

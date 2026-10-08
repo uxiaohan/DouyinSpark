@@ -140,6 +140,43 @@ async function anyTextVisible(page: Page, texts: readonly string[]): Promise<boo
   return false
 }
 
+/** URL 取不到时不抛错：页面/context 已崩时 url() 会扔异常，判定逻辑不能被它带崩 */
+function safeUrl(page: Page): string {
+  try {
+    return page.url()
+  } catch {
+    return ""
+  }
+}
+
+/**
+ * URL 落在登录域即未登录。抖音对失效 cookie 的 /chat 请求会 302 到登录域，
+ * 这比"等页面里出现登录文案"可靠：登录框常常渲染在 iframe 里，body.innerText
+ * 取不到，文案派判定会漏（漏了就落到 not_ready，用户看到的是"页面未就绪"
+ * 而不是"cookie 失效"——2026-10-08 用户服务器上一个账号就这么白躺了一轮）。
+ * 失效 cookie 重开浏览器也无益，所以这里提前判掉，别浪费重试预算。
+ */
+function isLoginUrl(url: string): boolean {
+  return /(^|\/\/)(login|sso)\.douyin\.com/.test(url) || /douyin\.com\/login\b/.test(url)
+}
+
+/**
+ * 失败现场快照：终态 URL + 一段 body 正文。
+ * not_ready 的成因（登录页/风控页/代理错误页/SPA 没起来）从返回值上看不出
+ * 区别，把现场原样落进日志，事后才能归类；两者都拿不到时（页面已崩）也
+ * 不因此抛错——证据采集失败不能把失败本身再放大。
+ */
+async function pageSnapshot(page: Page): Promise<string> {
+  const url = safeUrl(page)
+  let body = ""
+  try {
+    body = (await page.locator("body").innerText({ timeout: 3000 })).replace(/\s+/g, " ").trim()
+  } catch {
+    /* 页面结构变了/context 崩了：正文拿不到就算了，URL 仍在 */
+  }
+  return `url=${url || "(取不到)"} body=${body.slice(0, 200) || "(空)"}`
+}
+
 export async function detectBlocked(page: Page): Promise<string | null> {
   let body = ""
   try {
@@ -164,6 +201,8 @@ export async function openChatPage(page: Page): Promise<ChatPageResult> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     const blocked = await detectBlocked(page)
     if (blocked) return { ok: false, kind: "risk", blocked }
+    // 先看 URL 再看文案：登录域落地页里文案常年在 iframe 里，文案派会漏
+    if (isLoginUrl(safeUrl(page))) return { ok: false, kind: "login" }
     if (await anyTextVisible(page, SEL.loginRequiredText)) return { ok: false, kind: "login" }
     if (await firstVisible(page, SEL.searchInput, 3000)) {
       // 搜索框首帧可能还不可交互，缓一拍再开工
@@ -179,6 +218,7 @@ export async function openChatPage(page: Page): Promise<ChatPageResult> {
       }
     }
   }
+  log.warn("聊天页三轮尝试后仍未就绪", { snapshot: await pageSnapshot(page) })
   return { ok: false, kind: "not_ready" }
 }
 

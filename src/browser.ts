@@ -4,7 +4,7 @@ import { EVASION_SCRIPT, pickFingerprint } from "./fingerprint"
 import { log } from "./logger"
 import type { AccountRow, ProxySetting } from "./types"
 
-type AccountPage = { context: BrowserContext; page: Page }
+export type AccountPage = { context: BrowserContext; page: Page }
 
 const browsers = new Map<string, Browser>()
 
@@ -25,6 +25,34 @@ const LAUNCH_ARGS = [
 
 function proxyKey(proxy: ProxySetting | null): string {
   return proxy ? `${proxy.server}|${proxy.username ?? ""}|${proxy.password ?? ""}` : ""
+}
+
+/** 账号的代理配置。openAccountPage 与 closeAccountBrowser 共用同一把 key 的来源 */
+export function accountProxy(account: AccountRow): ProxySetting | null {
+  // 没填账密时库里是 null，ProxySetting 本来就是 string | null：原样透传。
+  // 转成 Playwright 认的 undefined 是 launch() 的事（browser.ts 里 proxy.username ?? undefined），
+  // 两处口径不漂
+  return account.proxy_server
+    ? { server: account.proxy_server, username: account.proxy_username, password: account.proxy_password }
+    : null
+}
+
+/**
+ * 关掉某个账号对应的浏览器实例并摘掉缓存：下次 getBrowser 会真正重新 launch，
+ * 而不是复用同一个 Chromium 进程。
+ *
+ * 为什么需要关进程（而不是只关 context）：聊天页"能打开但搜索框不来"的瞬时
+ * 故障里，有一类是渲染进程卡死/context 内存膨胀，openChatPage 内部的 reload
+ * 在同一进程里反复重试治不了它，只有整个浏览器重开能换掉这块状态。
+ *
+ * 同代理 key 的多个账号共用同一个浏览器，但 runOnce 里账号是串行跑的，
+ * 运行中途关闭不会波及其他账号；下一次 openAccountPage 自然重新 launch。
+ */
+export async function closeAccountBrowser(proxy: ProxySetting | null): Promise<void> {
+  const cached = browsers.get(proxyKey(proxy))
+  if (!cached) return
+  browsers.delete(proxyKey(proxy))
+  await cached.close().catch((err: unknown) => log.warn("关闭账号浏览器失败", { err: String(err) }))
 }
 
 async function launch(proxy: ProxySetting | null): Promise<Browser> {
@@ -70,9 +98,7 @@ function browserVersion(browser: Browser): string | null {
 }
 
 export async function openAccountPage(account: AccountRow): Promise<AccountPage> {
-  const proxy: ProxySetting | null = account.proxy_server
-    ? { server: account.proxy_server, username: account.proxy_username, password: account.proxy_password }
-    : null
+  const proxy = accountProxy(account)
   const browser = await getBrowser(proxy)
   const fp = pickFingerprint(browserVersion(browser))
   const context = await browser.newContext({
